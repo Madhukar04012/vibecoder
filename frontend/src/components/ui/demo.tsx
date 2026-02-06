@@ -1,20 +1,13 @@
-import { DottedSurface } from '@/components/ui/dotted-surface';
-import { cn } from '@/lib/utils';
+import { LiquidButton } from '@/components/ui/liquid-glass-button';
 
 export default function DemoOne() {
   return (
-    <DottedSurface className="size-full">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div
-          aria-hidden="true"
-          className={cn(
-            'pointer-events-none absolute -top-10 left-1/2 size-full -translate-x-1/2 rounded-full',
-            'bg-[radial-gradient(ellipse_at_center,--theme(--color-foreground/.1),transparent_50%)]',
-            'blur-[30px]'
-          )}
-        />
-        <h1 className="font-mono text-4xl font-semibold">Dotted Surface</h1>
+    <div className="flex min-h-[240px] w-full items-center justify-center bg-black px-6">
+      <div className="relative h-[200px] w-full max-w-[800px]">
+        <LiquidButton className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+          Liquid Glass
+        </LiquidButton>
       </div>
-    </DottedSurface>
+    </div>
   );
 }

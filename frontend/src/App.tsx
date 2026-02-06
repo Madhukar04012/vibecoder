@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowRight,
@@ -63,7 +64,7 @@ function Button({
   ariaLabel?: string;
 }) {
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:opacity-50 disabled:pointer-events-none';
+    'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-300/30 disabled:opacity-50 disabled:pointer-events-none backdrop-blur-xl border';
 
   const sizes: Record<ButtonSize, string> = {
     sm: 'h-9 px-3 text-sm',
@@ -72,9 +73,11 @@ function Button({
   };
 
   const variants: Record<ButtonVariant, string> = {
-    default: 'bg-gray-900 text-white hover:bg-gray-800',
-    ghost: 'bg-transparent text-gray-800 hover:bg-gray-100',
-    outline: 'border border-gray-200 bg-white text-gray-900 hover:bg-gray-50',
+    default:
+      'border-gray-200/70 bg-white/70 text-gray-900 hover:bg-white/80 dark:border-gray-800/60 dark:bg-white/10 dark:text-gray-100 dark:hover:bg-white/15',
+    ghost: 'border-transparent bg-transparent text-gray-800 hover:bg-gray-100/60 dark:text-gray-200 dark:hover:bg-white/10',
+    outline:
+      'border-gray-200/70 bg-white/40 text-gray-900 hover:bg-white/60 dark:border-gray-800/60 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10',
   };
 
   return (
@@ -92,14 +95,23 @@ function Button({
 }
 
 function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cx('rounded-2xl border border-gray-200 bg-white', className)}>{children}</div>;
+  return (
+    <div
+      className={cx(
+        'rounded-2xl border border-gray-200/70 bg-white/60 backdrop-blur-xl dark:border-gray-800/60 dark:bg-white/5',
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <span
       className={cx(
-        'inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700',
+        'inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 dark:border-gray-800 dark:bg-white/5 dark:text-gray-200',
         className
       )}
     >
@@ -109,10 +121,11 @@ function Badge({ children, className }: { children: React.ReactNode; className?:
 }
 
 function Separator({ className }: { className?: string }) {
-  return <div className={cx('h-px w-full bg-gray-200', className)} />;
+  return <div className={cx('h-px w-full bg-gray-200 dark:bg-gray-800', className)} />;
 }
 
 export default function App() {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [idea, setIdea] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -206,16 +219,16 @@ export default function App() {
     }, []);
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-white via-white to-gray-50">
+      <div className="min-h-screen bg-gradient-to-b from-white via-white to-gray-50 dark:from-gray-950 dark:via-gray-950 dark:to-black">
         <DottedSurface className="opacity-90" />
 
         <section className="relative z-10 min-h-screen flex items-center justify-center px-6 pt-32 pb-20">
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
-              <h1 className="text-7xl md:text-8xl font-bold tracking-tight mb-6 bg-gradient-to-br from-gray-900 to-gray-500 bg-clip-text text-transparent">
+              <h1 className="text-7xl md:text-8xl font-bold tracking-tight mb-6 bg-gradient-to-br from-gray-900 to-gray-500 bg-clip-text text-transparent dark:from-white dark:to-gray-400">
                 VibeCober
               </h1>
-              <p className="text-2xl md:text-3xl text-gray-500 mb-12">Turn ideas into real, runnable code.</p>
+              <p className="text-2xl md:text-3xl text-gray-500 mb-12 dark:text-gray-300">Turn ideas into real, runnable code.</p>
             </motion.div>
 
             <motion.div
@@ -235,7 +248,7 @@ export default function App() {
                     }
                   }}
                   placeholder={placeholder}
-                  className="min-h-[120px] w-full text-lg rounded-2xl bg-white/50 backdrop-blur-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none pr-14 p-4 outline-none"
+                  className="min-h-[120px] w-full text-lg rounded-2xl bg-white/50 text-gray-900 placeholder:text-gray-500 backdrop-blur-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none pr-14 p-4 outline-none dark:bg-gray-950/40 dark:text-gray-100 dark:placeholder:text-gray-500 dark:border-gray-800"
                 />
                 <Button
                   onClick={() => void handleGenerate()}
@@ -247,7 +260,7 @@ export default function App() {
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </div>
-              <p className="text-sm text-gray-500 mt-3">Press Enter to generate</p>
+              <p className="text-sm text-gray-500 mt-3 dark:text-gray-300">Press Enter to generate</p>
             </motion.div>
           </div>
         </section>
@@ -258,7 +271,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900"
+              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900 dark:text-gray-100"
             >
               How it works
             </motion.h2>
@@ -275,10 +288,10 @@ export default function App() {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.2 }}
                 >
-                  <Card className="p-8 bg-white/50 backdrop-blur-xl border-gray-200 hover:border-blue-300/50 transition-all">
+                  <Card className="p-8 bg-white/50 backdrop-blur-xl border-gray-200 hover:border-blue-300/50 transition-all dark:bg-white/5 dark:border-gray-800">
                     <step.icon className="w-12 h-12 text-blue-600 mb-6" />
-                    <h3 className="text-2xl font-semibold mb-4 text-gray-900">{step.title}</h3>
-                    <p className="text-gray-500">{step.desc}</p>
+                    <h3 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-gray-100">{step.title}</h3>
+                    <p className="text-gray-500 dark:text-gray-300">{step.desc}</p>
                   </Card>
                 </motion.div>
               ))}
@@ -286,13 +299,13 @@ export default function App() {
           </div>
         </section>
 
-        <section id="features" className="relative py-32 px-6 bg-gray-50">
+        <section id="features" className="relative py-32 px-6 bg-transparent">
           <div className="max-w-6xl mx-auto">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900"
+              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900 dark:text-gray-100"
             >
               Why developers like it
             </motion.h2>
@@ -322,10 +335,10 @@ export default function App() {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
                 >
-                  <Card className="p-6 bg-white/50 backdrop-blur-xl border-gray-200">
+                  <Card className="p-6 bg-white/50 backdrop-blur-xl border-gray-200 dark:bg-white/5 dark:border-gray-800">
                     <CheckCircle2 className="w-8 h-8 text-blue-600 mb-4" />
-                    <h3 className="text-xl font-semibold mb-2 text-gray-900">{feature.title}</h3>
-                    <p className="text-gray-500">{feature.desc}</p>
+                    <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">{feature.title}</h3>
+                    <p className="text-gray-500 dark:text-gray-300">{feature.desc}</p>
                   </Card>
                 </motion.div>
               ))}
@@ -339,7 +352,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900"
+              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900 dark:text-gray-100"
             >
               Simple pricing
             </motion.h2>
@@ -371,24 +384,29 @@ export default function App() {
                 >
                   <Card
                     className={cx(
-                      'p-8 bg-white/50 backdrop-blur-xl',
-                      plan.highlight && 'border-blue-600/40 bg-blue-50/40'
+                      'p-8 bg-white/50 backdrop-blur-xl dark:bg-white/5',
+                      plan.highlight && 'border-blue-600/40 bg-blue-50/40 dark:bg-blue-500/10'
                     )}
                   >
-                    <h3 className="text-2xl font-bold mb-2 text-gray-900">{plan.name}</h3>
-                    <div className="text-4xl font-bold mb-6 text-gray-900">
+                    <h3 className="text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">{plan.name}</h3>
+                    <div className="text-4xl font-bold mb-6 text-gray-900 dark:text-gray-100">
                       {plan.price}
-                      <span className="text-lg text-gray-500 font-normal">/mo</span>
+                      <span className="text-lg text-gray-500 font-normal dark:text-gray-300">/mo</span>
                     </div>
                     <ul className="space-y-3 mb-8">
                       {plan.features.map((feature) => (
                         <li key={feature} className="flex items-center gap-2">
                           <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                          <span className="text-gray-600">{feature}</span>
+                          <span className="text-gray-600 dark:text-gray-300">{feature}</span>
                         </li>
                       ))}
                     </ul>
-                    <Button className="w-full" variant={plan.highlight ? 'default' : 'outline'} size="lg">
+                    <Button
+                      className="w-full"
+                      variant={plan.highlight ? 'default' : 'outline'}
+                      size="lg"
+                      onClick={() => navigate('/signup')}
+                    >
                       Get started
                     </Button>
                   </Card>
@@ -398,13 +416,13 @@ export default function App() {
           </div>
         </section>
 
-        <section id="testimonials" className="relative py-32 px-6 bg-gray-50">
+        <section id="testimonials" className="relative py-32 px-6 bg-transparent">
           <div className="max-w-6xl mx-auto">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900"
+              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900 dark:text-gray-100"
             >
               Trusted by developers
             </motion.h2>
@@ -421,11 +439,11 @@ export default function App() {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
                 >
-                  <Card className="p-6 bg-white/50 backdrop-blur-xl border-gray-200">
-                    <p className="text-gray-600 mb-6 italic">"{testimonial.text}"</p>
+                  <Card className="p-6 bg-white/50 backdrop-blur-xl border-gray-200 dark:bg-white/5 dark:border-gray-800">
+                    <p className="text-gray-600 mb-6 italic dark:text-gray-300">"{testimonial.text}"</p>
                     <div>
-                      <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                      <p className="text-sm text-gray-500">{testimonial.role}</p>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">{testimonial.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-300">{testimonial.role}</p>
                     </div>
                   </Card>
                 </motion.div>
@@ -440,7 +458,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900"
+              className="text-4xl md:text-5xl font-bold text-center mb-20 text-gray-900 dark:text-gray-100"
             >
               FAQ
             </motion.h2>
@@ -464,9 +482,9 @@ export default function App() {
                   viewport={{ once: true }}
                   transition={{ delay: 0.1 }}
                 >
-                  <Card className="p-6 bg-white/50 backdrop-blur-xl border-gray-200">
-                    <h3 className="text-lg font-semibold mb-2 text-gray-900">{faq.q}</h3>
-                    <p className="text-gray-600">{faq.a}</p>
+                  <Card className="p-6 bg-white/50 backdrop-blur-xl border-gray-200 dark:bg-white/5 dark:border-gray-800">
+                    <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">{faq.q}</h3>
+                    <p className="text-gray-600 dark:text-gray-300">{faq.a}</p>
                   </Card>
                 </motion.div>
               ))}
@@ -474,13 +492,13 @@ export default function App() {
           </div>
         </section>
 
-        <section id="contact" className="relative py-32 px-6 bg-gray-50">
+        <section id="contact" className="relative py-32 px-6 bg-transparent">
           <div className="max-w-4xl mx-auto text-center">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold mb-8 text-gray-900"
+              className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 dark:text-gray-100"
             >
               Ready to build?
             </motion.h2>
@@ -488,7 +506,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-xl text-gray-500 mb-12"
+              className="text-xl text-gray-500 mb-12 dark:text-gray-300"
             >
               Join thousands of developers shipping faster with VibeCober
             </motion.p>
@@ -498,7 +516,7 @@ export default function App() {
               viewport={{ once: true }}
               className="flex flex-col sm:flex-row gap-4 justify-center"
             >
-              <Button size="lg" className="text-lg px-8">
+              <Button size="lg" className="text-lg px-8" onClick={() => navigate('/signup')}>
                 Get Started Free
               </Button>
               <Button size="lg" variant="outline" className="text-lg px-8">
@@ -508,62 +526,62 @@ export default function App() {
           </div>
         </section>
 
-        <footer className="relative border-t border-gray-200 py-12 px-6">
+        <footer className="relative border-t border-gray-200 py-12 px-6 dark:border-gray-800">
           <div className="max-w-6xl mx-auto">
             <div className="grid md:grid-cols-4 gap-8 mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-5 h-5 text-blue-600" />
-                  <span className="font-semibold text-gray-900">VibeCober</span>
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">VibeCober</span>
                 </div>
-                <p className="text-sm text-gray-500">Turn ideas into real, runnable code.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-300">Turn ideas into real, runnable code.</p>
               </div>
               <div>
-                <h4 className="font-semibold mb-4 text-gray-900">Product</h4>
-                <ul className="space-y-2 text-sm text-gray-500">
+                <h4 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Product</h4>
+                <ul className="space-y-2 text-sm text-gray-500 dark:text-gray-300">
                   <li>
-                    <a href="#features" className="hover:text-gray-900 transition-colors">
+                    <a href="#features" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                       Features
                     </a>
                   </li>
                   <li>
-                    <a href="#pricing" className="hover:text-gray-900 transition-colors">
+                    <a href="#pricing" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                       Pricing
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-gray-900 transition-colors">
+                    <a href="#" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                       Docs
                     </a>
                   </li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold mb-4 text-gray-900">Company</h4>
-                <ul className="space-y-2 text-sm text-gray-500">
+                <h4 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Company</h4>
+                <ul className="space-y-2 text-sm text-gray-500 dark:text-gray-300">
                   <li>
-                    <a href="#" className="hover:text-gray-900 transition-colors">
+                    <a href="#" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                       About
                     </a>
                   </li>
                   <li>
-                    <a href="#" className="hover:text-gray-900 transition-colors">
+                    <a href="#" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                       Blog
                     </a>
                   </li>
                   <li>
-                    <a href="#careers" className="hover:text-gray-900 transition-colors">
+                    <a href="#careers" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                       Careers
                     </a>
                   </li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold mb-4 text-gray-900">Connect</h4>
+                <h4 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Connect</h4>
                 <div className="flex gap-4">
                   <a
                     href="#"
-                    className="text-gray-500 hover:text-gray-900 transition-colors"
+                    className="text-gray-500 hover:text-gray-900 transition-colors dark:text-gray-300 dark:hover:text-gray-100"
                     aria-label="GitHub"
                     title="GitHub"
                   >
@@ -571,7 +589,7 @@ export default function App() {
                   </a>
                   <a
                     href="#"
-                    className="text-gray-500 hover:text-gray-900 transition-colors"
+                    className="text-gray-500 hover:text-gray-900 transition-colors dark:text-gray-300 dark:hover:text-gray-100"
                     aria-label="Twitter"
                     title="Twitter"
                   >
@@ -579,7 +597,7 @@ export default function App() {
                   </a>
                   <a
                     href="#"
-                    className="text-gray-500 hover:text-gray-900 transition-colors"
+                    className="text-gray-500 hover:text-gray-900 transition-colors dark:text-gray-300 dark:hover:text-gray-100"
                     aria-label="Email"
                     title="Email"
                   >
@@ -589,16 +607,16 @@ export default function App() {
               </div>
             </div>
             <Separator className="mb-8" />
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500 dark:text-gray-300">
               <p>© 2026 VibeCober. All rights reserved.</p>
               <div className="flex gap-6">
-                <a href="#" className="hover:text-gray-900 transition-colors">
+                <a href="#" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                   Privacy
                 </a>
-                <a href="#" className="hover:text-gray-900 transition-colors">
+                <a href="#" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                   Terms
                 </a>
-                <a href="#" className="hover:text-gray-900 transition-colors">
+                <a href="#" className="hover:text-gray-900 transition-colors dark:hover:text-gray-100">
                   License
                 </a>
               </div>
@@ -610,20 +628,20 @@ export default function App() {
   };
 
   const GeneratorPage = () => (
-    <div className="min-h-screen pt-32 pb-20 px-6 bg-white">
+    <div className="min-h-screen pt-32 pb-20 px-6 bg-white dark:bg-gray-950">
       <div className="max-w-4xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
           <div>
-            <h1 className="text-4xl font-bold mb-4 text-gray-900">Generate Project</h1>
-            <p className="text-gray-500">Describe your project and let AI build it for you.</p>
+            <h1 className="text-4xl font-bold mb-4 text-gray-900 dark:text-gray-100">Generate Project</h1>
+            <p className="text-gray-500 dark:text-gray-300">Describe your project and let AI build it for you.</p>
           </div>
 
-          <Card className="p-8 bg-white/50 backdrop-blur-xl border-gray-200">
+          <Card className="p-8">
             <textarea
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
               placeholder="Describe your project idea..."
-              className="min-h-[200px] w-full text-lg mb-6 resize-none rounded-2xl bg-white/60 backdrop-blur-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-all p-4 outline-none"
+              className="min-h-[200px] w-full text-lg mb-6 resize-none rounded-2xl bg-white/60 text-gray-900 placeholder:text-gray-500 backdrop-blur-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 transition-all p-4 outline-none dark:bg-gray-950/40 dark:text-gray-100 dark:placeholder:text-gray-500 dark:border-gray-800"
             />
             <Button
               onClick={() => void handleGenerate()}
@@ -633,7 +651,7 @@ export default function App() {
             >
               {isGenerating ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin dark:border-gray-900 dark:border-t-transparent" />
                   Generating...
                 </>
               ) : (
@@ -648,10 +666,10 @@ export default function App() {
           {isGenerating && (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <Card key={i} className="p-6 bg-white/50 backdrop-blur-xl border-gray-200">
+                <Card key={i} className="p-6">
                   <div className="animate-pulse space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4" />
-                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                    <div className="h-4 bg-gray-200 rounded w-3/4 dark:bg-gray-800" />
+                    <div className="h-4 bg-gray-200 rounded w-1/2 dark:bg-gray-800" />
                   </div>
                 </Card>
               ))}
@@ -668,7 +686,7 @@ export default function App() {
     return (
       <div className="select-none">
         <div
-          className="flex items-center gap-2 py-1 px-2 hover:bg-gray-100 rounded cursor-pointer"
+          className="flex items-center gap-2 py-1 px-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded cursor-pointer"
           style={{ paddingLeft: `${level * 20 + 8}px` }}
           onClick={() => node.type === 'folder' && setIsOpen(!isOpen)}
         >
@@ -680,10 +698,10 @@ export default function App() {
           ) : (
             <>
               <div className="w-4" />
-              <Terminal className="w-4 h-4 text-gray-400" />
+              <Terminal className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             </>
           )}
-          <span className="text-sm text-gray-800">{node.name}</span>
+          <span className="text-sm text-gray-800 dark:text-gray-200">{node.name}</span>
         </div>
         {node.type === 'folder' && isOpen && node.children && (
           <div>
@@ -697,30 +715,30 @@ export default function App() {
   };
 
   const PreviewPage = () => (
-    <div className="min-h-screen pt-32 pb-20 px-6 bg-white">
+    <div className="min-h-screen pt-32 pb-20 px-6 bg-white dark:bg-gray-950">
       <div className="max-w-6xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
           <div>
-            <h1 className="text-4xl font-bold mb-4 text-gray-900">Project Preview</h1>
-            <p className="text-gray-500">Review your project before building.</p>
+            <h1 className="text-4xl font-bold mb-4 text-gray-900 dark:text-gray-100">Project Preview</h1>
+            <p className="text-gray-500 dark:text-gray-300">Review your project before building.</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <Card className="p-8 bg-white/50 backdrop-blur-xl border-gray-200">
-              <h2 className="text-2xl font-semibold mb-4 text-gray-900">Project Summary</h2>
-              <p className="text-gray-600 mb-6">{projectData?.idea}</p>
+            <Card className="p-8">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Project Summary</h2>
+              <p className="text-gray-600 mb-6 dark:text-gray-300">{projectData?.idea}</p>
 
-              <h3 className="font-semibold mb-3 text-gray-900">Detected Modules</h3>
+              <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Detected Modules</h3>
               <div className="space-y-2 mb-6">
                 {projectData?.modules.map((module) => (
                   <div key={module} className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm text-gray-700">{module}</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{module}</span>
                   </div>
                 ))}
               </div>
 
-              <h3 className="font-semibold mb-3 text-gray-900">Tech Stack</h3>
+              <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Tech Stack</h3>
               <div className="flex flex-wrap gap-2">
                 {projectData?.techStack.map((tech) => (
                   <Badge key={tech}>{tech}</Badge>
@@ -728,9 +746,9 @@ export default function App() {
               </div>
             </Card>
 
-            <Card className="p-8 bg-white/50 backdrop-blur-xl border-gray-200">
-              <h2 className="text-2xl font-semibold mb-4 text-gray-900">Project Structure</h2>
-              <div className="bg-gray-50 rounded-lg p-4 max-h-[500px] overflow-auto border border-gray-200">
+            <Card className="p-8">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Project Structure</h2>
+              <div className="rounded-lg p-4 max-h-[500px] overflow-auto border border-gray-200/70 bg-white/40 backdrop-blur-xl dark:border-gray-800/60 dark:bg-white/5">
                 {projectData?.structure.map((node) => (
                   <FolderTree key={node.name} node={node} />
                 ))}
@@ -767,24 +785,24 @@ export default function App() {
     const currentStep = Math.floor((buildProgress / 100) * steps.length);
 
     return (
-      <div className="min-h-screen pt-32 pb-20 px-6 bg-white">
+      <div className="min-h-screen pt-32 pb-20 px-6 bg-white dark:bg-gray-950">
         <div className="max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <div>
-              <h1 className="text-4xl font-bold mb-4 text-gray-900">Building Project</h1>
-              <p className="text-gray-500">
+              <h1 className="text-4xl font-bold mb-4 text-gray-900 dark:text-gray-100">Building Project</h1>
+              <p className="text-gray-500 dark:text-gray-300">
                 {buildProgress === 100 ? 'Your project is ready!' : 'Please wait while we build your project...'}
               </p>
             </div>
 
-            <Card className="p-8 bg-white/50 backdrop-blur-xl border-gray-200">
+            <Card className="p-8">
               <div className="space-y-6">
                 <div>
-                  <div className="flex justify-between text-sm mb-2 text-gray-700">
+                  <div className="flex justify-between text-sm mb-2 text-gray-700 dark:text-gray-300">
                     <span>Progress</span>
                     <span>{buildProgress}%</span>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden dark:bg-gray-800">
                     <motion.div
                       className="h-full bg-blue-600"
                       initial={{ width: 0 }}
@@ -801,10 +819,10 @@ export default function App() {
                       className={cx(
                         'flex items-center gap-3 p-3 rounded-lg transition-all',
                         i < currentStep
-                          ? 'bg-blue-50 text-gray-900'
+                          ? 'bg-blue-50 text-gray-900 dark:bg-blue-500/10 dark:text-gray-100'
                           : i === currentStep
-                          ? 'bg-blue-100/60 text-gray-900'
-                          : 'text-gray-500'
+                          ? 'bg-blue-100/60 text-gray-900 dark:bg-blue-500/15 dark:text-gray-100'
+                          : 'text-gray-500 dark:text-gray-300'
                       )}
                     >
                       {i < currentStep ? (
@@ -812,19 +830,19 @@ export default function App() {
                       ) : i === currentStep ? (
                         <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
                       ) : (
-                        <div className="w-5 h-5 border-2 border-gray-200 rounded-full flex-shrink-0" />
+                        <div className="w-5 h-5 border-2 border-gray-200 rounded-full flex-shrink-0 dark:border-gray-700" />
                       )}
                       <span>{step}</span>
                     </div>
                   ))}
                 </div>
 
-                <Card className="p-4 bg-gray-50 border-gray-200">
+                <Card className="p-4 bg-white/40 dark:bg-white/5">
                   <div className="font-mono text-sm space-y-1">
                     <div className="text-blue-600">$ npm install</div>
-                    <div className="text-gray-500">✓ Dependencies installed</div>
+                    <div className="text-gray-500 dark:text-gray-300">✓ Dependencies installed</div>
                     <div className="text-blue-600">$ npm run build</div>
-                    <div className="text-gray-500">✓ Build completed successfully</div>
+                    <div className="text-gray-500 dark:text-gray-300">✓ Build completed successfully</div>
                     {buildProgress === 100 && <div className="text-green-600">✓ Project ready to use</div>}
                   </div>
                 </Card>
@@ -849,8 +867,15 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      <Header onLogoClick={() => setCurrentPage('landing')} onGetStarted={() => setCurrentPage('generator')} />
+    <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      <Header
+        onLogoClick={() => {
+          setCurrentPage('landing');
+          navigate('/');
+        }}
+        onSignIn={() => navigate('/login')}
+        onGetStarted={() => navigate('/signup')}
+      />
       <AnimatePresence mode="wait">
         {currentPage === 'landing' && <LandingPage key="landing" />}
         {currentPage === 'generator' && <GeneratorPage key="generator" />}

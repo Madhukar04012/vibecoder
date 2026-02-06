@@ -4,13 +4,21 @@ import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useScroll } from '@/components/ui/use-scroll';
 
 function WordmarkIcon({ className }: { className?: string }) {
   return (
-    <span className={cn('inline-flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900', className)}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100',
+        className
+      )}
+    >
       <span>VibeCober</span>
-      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Local AI</span>
+      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300">
+        Local AI
+      </span>
     </span>
   );
 }
@@ -117,8 +125,8 @@ export function Header({
     <header
       className={cn(
         'fixed top-0 left-0 right-0 z-50',
-        'bg-white/80 backdrop-blur-xl',
-        scrolled ? 'border-b border-gray-200' : 'border-b border-transparent'
+        'bg-white/80 backdrop-blur-xl dark:bg-gray-950/70',
+        scrolled ? 'border-b border-gray-200 dark:border-gray-800' : 'border-b border-transparent'
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center px-6">
@@ -143,7 +151,9 @@ export function Header({
               aria-current={activeHref === l.href ? 'page' : undefined}
               className={cn(
                 'transition-colors',
-                activeHref === l.href ? 'text-gray-900' : 'text-gray-600 hover:text-gray-900'
+                activeHref === l.href
+                  ? 'text-gray-900 dark:text-gray-100'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               )}
             >
               {l.label}
@@ -152,14 +162,18 @@ export function Header({
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
+          <ThemeToggle />
           <Button
             variant="outline"
             onClick={onSignIn}
-            className="h-10 rounded-xl border-gray-300 bg-white px-5 text-gray-900 hover:bg-gray-50"
+            className="h-10 rounded-xl px-5"
           >
             Sign In
           </Button>
-          <Button onClick={onGetStarted} className="h-10 rounded-xl bg-gray-900 px-5 text-white hover:bg-gray-800">
+          <Button
+            onClick={onGetStarted}
+            className="h-10 rounded-xl px-5 border border-gray-200/70 bg-white/70 text-gray-900 hover:bg-white/80 dark:border-gray-800/60 dark:bg-white/10 dark:text-gray-100 dark:hover:bg-white/15"
+          >
             Get Started
           </Button>
         </div>
@@ -167,7 +181,7 @@ export function Header({
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden ml-auto rounded-xl text-gray-900 hover:bg-gray-100"
+          className="md:hidden ml-auto rounded-xl text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-white/10"
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? 'Close menu' : 'Open menu'}
         >
@@ -179,8 +193,13 @@ export function Header({
         createPortal(
           <div className="fixed inset-0 z-50 md:hidden">
             <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
-            <div className="absolute left-0 right-0 top-0 mx-auto mt-20 w-[min(92vw,32rem)] rounded-2xl border border-gray-200 bg-white/95 backdrop-blur-xl p-4">
+            <div className="absolute left-0 right-0 top-0 mx-auto mt-20 w-[min(92vw,32rem)] rounded-2xl border border-gray-200 bg-white/95 backdrop-blur-xl p-4 dark:border-gray-800 dark:bg-gray-950/90">
               <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Theme</span>
+                  <ThemeToggle />
+                </div>
+
                 {links.map((l) => (
                   <a
                     key={l.href}
@@ -195,23 +214,23 @@ export function Header({
                       }
                       setOpen(false);
                     }}
-                    className="rounded-xl px-3 py-3 text-gray-800 hover:bg-gray-100 transition-colors"
+                    className="rounded-xl px-3 py-3 text-gray-800 hover:bg-gray-100 transition-colors dark:text-gray-100 dark:hover:bg-white/10"
                   >
                     {l.label}
                   </a>
                 ))}
 
-                <div className="h-px w-full bg-gray-200" />
+                <div className="h-px w-full bg-gray-200 dark:bg-gray-800" />
 
                 <Button
                   variant="outline"
-                  className="w-full rounded-xl border-gray-300 bg-white text-gray-900 hover:bg-gray-50"
+                  className="w-full rounded-xl"
                   onClick={onSignIn}
                 >
                   Sign In
                 </Button>
                 <Button
-                  className="w-full rounded-xl bg-gray-900 text-white hover:bg-gray-800"
+                  className="w-full rounded-xl border border-gray-200/70 bg-white/70 text-gray-900 hover:bg-white/80 dark:border-gray-800/60 dark:bg-white/10 dark:text-gray-100 dark:hover:bg-white/15"
                   onClick={onGetStarted}
                 >
                   Get Started
