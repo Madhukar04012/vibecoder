@@ -10,17 +10,32 @@ def test_full_flow():
     print("=" * 60)
     print("VibeCober Full Flow Test")
     print("=" * 60)
-    
-    # 1. Login
-    print("\n[1] Logging in...")
+
+    test_email = "testuser@vibecober.com"
+    test_password = "password123"
+
+    # 1. Signup (or login if user exists) - self-contained test
+    print("\n[1] Creating/locating user...")
+    r = requests.post(f"{API_BASE}/auth/register", json={
+        "email": test_email,
+        "password": test_password,
+        "name": "Test User"
+    })
+    if r.status_code in (200, 201):
+        print(f"    [OK] User registered")
+    elif r.status_code == 400 and "already registered" in r.text.lower():
+        print(f"    [OK] User exists, will login")
+    else:
+        print(f"    [INFO] Signup: {r.status_code}, trying login...")
+
     r = requests.post(f"{API_BASE}/auth/login", json={
-        "email": "testuser@vibecober.com",
-        "password": "password123"
+        "email": test_email,
+        "password": test_password
     })
     if r.status_code != 200:
         print(f"Login failed: {r.status_code} {r.text}")
         return
-    
+
     token = r.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
     print(f"    [OK] Got token")

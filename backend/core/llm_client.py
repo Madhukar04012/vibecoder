@@ -7,10 +7,18 @@ import subprocess
 import json
 import os
 import re
+import sys
 
 
-# Ollama executable path (Windows default)
-OLLAMA_PATH = os.path.expanduser("~\\AppData\\Local\\Programs\\Ollama\\ollama.exe")
+def _get_ollama_path() -> str:
+    """Get Ollama executable path - cross-platform."""
+    env_path = os.getenv("OLLAMA_PATH")
+    if env_path:
+        return env_path
+    if sys.platform == "win32":
+        return os.path.expanduser("~\\AppData\\Local\\Programs\\Ollama\\ollama.exe")
+    # Linux/macOS - ollama is typically in PATH
+    return "ollama"
 
 
 def call_ollama(prompt: str, model: str = "mistral"):
@@ -19,8 +27,9 @@ def call_ollama(prompt: str, model: str = "mistral"):
     Returns None if anything fails (timeout, parse error, etc.)
     """
     try:
+        ollama_path = _get_ollama_path()
         result = subprocess.run(
-            [OLLAMA_PATH, "run", model],
+            [ollama_path, "run", model],
             input=prompt,
             capture_output=True,
             timeout=120,

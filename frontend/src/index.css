@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes wave {
+	0% {
+		transform: translateX(0);
+	}
+	50% {
+		transform: translateX(-3%);
+	}
+	100% {
+		transform: translateX(0);
+	}
+}
+
+.animate-wave-slow {
+	animation: wave 18s ease-in-out infinite;
+}
+
+.animate-wave-slower {
+	animation: wave 26s ease-in-out infinite;
+}

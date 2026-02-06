@@ -2,6 +2,27 @@
 
 All notable changes to VibeCober.
 
+## [0.3.1] - 2026-02-06
+
+### Fixed
+
+- **CORS**: Removed invalid `*` with `credentials=True`; use explicit localhost origins
+- **Auth API**: Added `/auth/register` alias for `/auth/signup` (common convention)
+- **JWT**: Ensure `sub` claim is always string for UUID compatibility
+- **Build**: Merge auth, tester, deployer outputs into project build (was only using coder)
+- **LLM Client**: Cross-platform Ollama path (Linux/Mac use `ollama` from PATH)
+- **test_flow.py**: Self-contained test (signup before login)
+- **FolderTree**: Fixed duplicate React keys in project preview
+
+### Added
+
+- **Frontend**: Real API integration - calls `/generate/project` instead of mock data
+- **Frontend**: Error display when generation fails
+- **Frontend**: CLI command hint on build completion
+- **.env.example**: `OLLAMA_PATH` for custom Ollama location
+
+---
+
 ## [0.3.0] - 2026-02-04
 
 ### 🧠 Phase 2: Agentic Architecture

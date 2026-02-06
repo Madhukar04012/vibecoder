@@ -189,7 +189,11 @@ def handle_generate(args):
         print("\n" + "=" * 60)
         print("\n[BUILDING PROJECT...]")
         
-        structure = result.get("agent_outputs", {}).get("coder") or result.get("project_structure", {})
+        from backend.generator.project_builder import merge_agent_outputs
+        
+        coder_output = result.get("agent_outputs", {}).get("coder") or result.get("project_structure", {})
+        agent_outputs = result.get("agent_outputs", {})
+        structure = merge_agent_outputs(coder_output, agent_outputs) if agent_outputs else coder_output
         build_result = build_project(structure, args.output)
         
         print(f"\n   Output: {build_result['output_dir']}")

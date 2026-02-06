@@ -28,12 +28,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 def verify_token(token: str) -> Optional[str]:
-    """Verify a JWT token and return the user ID"""
+    """Verify a JWT token and return the user ID (string for UUID compatibility)"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        sub = payload.get("sub")
+        if sub is None:
             return None
-        return user_id
+        return str(sub)  # Ensure string for UUID/int compatibility
     except JWTError:
         return None
