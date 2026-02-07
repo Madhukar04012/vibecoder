@@ -8,6 +8,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import func as sa_func, case
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -112,20 +113,22 @@ def get_project_log_summary(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    logs = (
-        db.query(ExecutionLog)
+    # Use SQL aggregation instead of loading all rows into Python
+    row = (
+        db.query(
+            sa_func.count(ExecutionLog.id).label("total"),
+            sa_func.sum(case((ExecutionLog.status == "success", 1), else_=0)).label("success"),
+            sa_func.sum(case((ExecutionLog.status == "failure", 1), else_=0)).label("failure"),
+            sa_func.coalesce(sa_func.sum(ExecutionLog.files_created), 0).label("files"),
+        )
         .filter(ExecutionLog.project_id == project_id)
-        .all()
+        .first()
     )
-
-    success_count = len([l for l in logs if l.status == "success"])
-    failure_count = len([l for l in logs if l.status == "failure"])
-    total_files = sum(l.files_created for l in logs)
 
     return {
         "project_id": project_id,
-        "total_executions": len(logs),
-        "success_count": success_count,
-        "failure_count": failure_count,
-        "total_files_created": total_files,
+        "total_executions": row.total,
+        "success_count": row.success,
+        "failure_count": row.failure,
+        "total_files_created": row.files,
     }

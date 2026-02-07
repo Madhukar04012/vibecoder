@@ -26,13 +26,14 @@ def call_ollama(prompt: str, model: str = "mistral"):
     Call local Ollama model and return parsed JSON response.
     Returns None if anything fails (timeout, parse error, etc.)
     """
+    timeout = int(os.getenv("OLLAMA_TIMEOUT", "120"))
     try:
         ollama_path = _get_ollama_path()
         result = subprocess.run(
             [ollama_path, "run", model],
             input=prompt,
             capture_output=True,
-            timeout=120,
+            timeout=timeout,
             encoding='utf-8',
             errors='replace'
         )

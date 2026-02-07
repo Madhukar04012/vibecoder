@@ -3,6 +3,8 @@ Artifacts API - File tree and generated outputs.
 MetaGPT-style: Track what was created.
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -18,7 +20,7 @@ router = APIRouter(prefix="/artifacts", tags=["Artifacts"])
 @router.get("/{project_id}")
 def get_artifacts(
     project_id: str,
-    run_id: int = None,
+    run_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -54,7 +56,7 @@ def get_artifacts(
 @router.get("/{project_id}/tree")
 def get_file_tree(
     project_id: str,
-    run_id: int = None,
+    run_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

@@ -9,8 +9,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables - try backend/.env first (when run from project root)
+_env_path = os.path.join(os.path.dirname(__file__), ".env")
+load_dotenv(_env_path)
+load_dotenv()  # fallback to cwd .env
 
 # Get DATABASE_URL from environment, default to SQLite for development
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./vibecober.db")

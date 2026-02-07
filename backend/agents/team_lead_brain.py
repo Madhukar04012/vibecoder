@@ -225,8 +225,10 @@ class TeamLeadBrain:
     def create_execution_order(self, selected_agents: List[str]) -> List[str]:
         """
         Create execution order respecting dependencies.
-        Uses topological sort.
+        Uses topological sort (Kahn's algorithm with deque for O(1) pops).
         """
+        from collections import deque
+
         # Build dependency graph
         graph = {agent: [] for agent in selected_agents}
         in_degree = {agent: 0 for agent in selected_agents}
@@ -239,16 +241,14 @@ class TeamLeadBrain:
                     in_degree[agent] += 1
         
         # Topological sort (Kahn's algorithm)
-        queue = [agent for agent in selected_agents if in_degree[agent] == 0]
+        queue = deque(sorted(a for a in selected_agents if in_degree[a] == 0))
         result = []
         
         while queue:
-            # Sort for determinism
-            queue.sort()
-            current = queue.pop(0)
+            current = queue.popleft()
             result.append(current)
             
-            for neighbor in graph[current]:
+            for neighbor in sorted(graph[current]):
                 in_degree[neighbor] -= 1
                 if in_degree[neighbor] == 0:
                     queue.append(neighbor)

@@ -2,9 +2,11 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
+email-validator
 python-jose[cryptography]
 bcrypt
 python-dotenv
 requests
 psycopg2-binary
 alembic
+pytest

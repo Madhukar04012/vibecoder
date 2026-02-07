@@ -6,11 +6,12 @@ MetaGPT-style: Runs are first-class, not implicit.
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from enum import Enum
 
 from backend.database import Base
 
 
-class RunStatus:
+class RunStatus(str, Enum):
     """Run execution states"""
     PENDING = "pending"
     RUNNING = "running"

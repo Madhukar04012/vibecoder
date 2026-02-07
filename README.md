@@ -1,6 +1,6 @@
 # VibeCober 🚀
 
-**AI-Powered Project Generator with Multi-Agent Architecture**
+## AI-Powered Project Generator with Multi-Agent Architecture
 
 Transform ideas into production-ready code using an intelligent agent pipeline.
 
@@ -15,7 +15,7 @@ python cli.py generate "SaaS blog with authentication" --production --build
 VibeCober is an **agentic software factory** that generates complete backend projects from a single idea:
 
 | What You Say | What You Get |
-|--------------|--------------|
+| ------------ | ------------ |
 | "Build a todo app" | SQLAlchemy models, FastAPI routes, tests |
 | "SaaS with auth and payments" | Full auth system, JWT, database schema, Docker config |
 | "API for a blog" | CRUD endpoints, user management, pytest suite |
@@ -28,7 +28,7 @@ VibeCober is an **agentic software factory** that generates complete backend pro
 
 VibeCober uses a **Team Lead Brain** to decide which agents run:
 
-```
+```text
 User Idea
     ↓
 Team Lead Brain (decides agents)
@@ -41,7 +41,7 @@ Generated Project
 ### Agent Stack
 
 | Agent | Purpose | Output |
-|-------|---------|--------|
+| ----- | ------- | ------ |
 | **Team Lead Brain** | Decides execution plan | JSON agent list |
 | **Planner** | Architecture decisions | Tech stack, modules |
 | **DB Schema** | Database design | SQLAlchemy models |
@@ -95,12 +95,16 @@ docker-compose up --build
 # Terminal 1 (API)
 uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 
-# Terminal 2 (Primary web UI)
+# Terminal 2 (Landing page)
 cd frontend
 npm run dev
+
+# IDE UI (Next.js)
+# npm run dev:ide
 ```
 
 Notes:
+
 - The default helper script `start-frontend.bat` starts `frontend`.
 
 ---
@@ -114,7 +118,7 @@ python cli.py generate "your idea" [options]
 ### Mode Flags
 
 | Flag | Description | Agents Used |
-|------|-------------|-------------|
+| ---- | ----------- | ----------- |
 | `--simple` | Minimal output | Planner, Coder |
 | `--full` | Standard generation (default) | Planner, DB, Auth, Coder |
 | `--production` | Full stack with tests & deploy | All 7 agents |
@@ -122,7 +126,7 @@ python cli.py generate "your idea" [options]
 ### Additional Flags
 
 | Flag | Description |
-|------|-------------|
+| ---- | ----------- |
 | `--build` | Write files to disk |
 | `--output ./path` | Custom output directory |
 | `--skip-tests` | Skip test generation |
@@ -147,12 +151,14 @@ python cli.py generate "SaaS invoicing app with auth" --production --build --out
 ## 🎯 Example Output
 
 **Command:**
+
 ```bash
 python cli.py generate "blog with authentication and comments" --production
 ```
 
 **Output:**
-```
+
+```text
 >>> VibeCober generating project
     Idea: "blog with authentication and comments"
     Mode: PRODUCTION
@@ -208,7 +214,7 @@ python cli.py generate "blog with authentication and comments" --production
 
 ## 📁 Generated Project Structure
 
-```
+```text
 output/
 ├── backend/
 │   ├── app/
@@ -252,6 +258,7 @@ docker-compose run --rm api pytest
 ```
 
 **Useful Makefile commands:**
+
 ```bash
 make dev      # Start development
 make prod     # Start production
@@ -293,7 +300,7 @@ VibeCober follows a **deterministic agent pipeline**:
 ### MetaGPT vs VibeCober
 
 | Aspect | MetaGPT | VibeCober |
-|--------|---------|-----------|
+| ------ | ------: | --------- |
 | Focus | Research | Production |
 | Output | Varied | Deterministic |
 | Auth | Optional | Built-in |

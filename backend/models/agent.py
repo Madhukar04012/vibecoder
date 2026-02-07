@@ -3,15 +3,16 @@ Agent Model - First-class persistent agent entities.
 MetaGPT-style: Agents are tracked, not just roles.
 """
 
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Enum as SQLEnum, ForeignKey, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from enum import Enum
 
 from backend.database import Base
 from backend.models.enums import AgentRole
 
 
-class AgentStatus:
+class AgentStatus(str, Enum):
     """Agent execution states"""
     IDLE = "idle"
     THINKING = "thinking"
@@ -31,7 +32,7 @@ class Agent(Base):
     project_id = Column(String, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     
     name = Column(String(100), nullable=False)  # "Team Lead", "Backend Engineer"
-    role = Column(Enum(AgentRole), nullable=False, index=True)
+    role = Column(SQLEnum(AgentRole), nullable=False, index=True)
     status = Column(String(20), default=AgentStatus.IDLE, nullable=False)
     
     # Agent metadata

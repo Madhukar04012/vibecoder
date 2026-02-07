@@ -7,6 +7,8 @@ Used by Team Lead Brain and Orchestrator.
 
 from typing import Dict, Any, Callable
 from dataclasses import dataclass
+from functools import lru_cache
+import importlib
 
 
 @dataclass
@@ -88,19 +90,9 @@ class AgentRegistry:
         return self._agents[name]
     
     def get_function(self, name: str) -> Callable:
-        """Get agent's execution function"""
+        """Get agent's execution function (cached after first import)"""
         spec = self.get(name)
-        
-        # Dynamic import
-        module_path, func_name = spec.module, spec.function
-        module = __import__(module_path, fromlist=[func_name])
-        
-        if not hasattr(module, func_name):
-            raise AttributeError(
-                f"Function '{func_name}' not found in module '{module_path}'"
-            )
-        
-        return getattr(module, func_name)
+        return _import_agent_function(spec.module, spec.function)
     
     def list_all(self) -> list[str]:
         """List all registered agent names"""
@@ -113,6 +105,15 @@ class AgentRegistry:
 
 # Global registry instance
 _registry = AgentRegistry()
+
+
+@lru_cache(maxsize=None)
+def _import_agent_function(module_path: str, func_name: str) -> Callable:
+    """Import and cache an agent function to avoid repeated dynamic imports."""
+    module = importlib.import_module(module_path)
+    if not hasattr(module, func_name):
+        raise AttributeError(f"Function '{func_name}' not found in module '{module_path}'")
+    return getattr(module, func_name)
 
 
 # ========== PUBLIC API ==========
