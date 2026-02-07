@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "..\\.venv\\Scripts\\python.exe spa_server.py --port 5173 --directory dist",
+    "dev:ide": "next dev -p 5174",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -36,7 +37,7 @@
     "globals": "^15.9.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.5.3",
-    "typescript-eslint": "^8.3.0"
+    "typescript": "5.5.4",
+    "typescript-eslint": "^8.54.0"
   }
 }

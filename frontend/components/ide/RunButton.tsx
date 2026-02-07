@@ -33,7 +33,7 @@ export function RunButton() {
     return (
         <Button
             onClick={handleClick}
-            variant={runState === 'error' ? 'destructive' : 'default'}
+            variant={runState === 'error' ? 'outline' : 'primary'}
             size="sm"
             className="gap-2"
             aria-label={isExecuting ? 'Stop execution' : 'Run project'}

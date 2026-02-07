@@ -10,6 +10,7 @@ node_modules
 dist
 dist-ssr
 *.local
+tsconfig.tsbuildinfo
 
 .vscode/*
 !.vscode/extensions.json

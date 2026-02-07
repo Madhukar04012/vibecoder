@@ -9,4 +9,12 @@ npm install
 npm run dev
 ```
 
-Then open `http://localhost:3000`.
+This serves the **landing page build** from `frontend/dist`.
+
+Then open `http://localhost:5173`.
+
+## Run the IDE app (Next.js)
+
+```bash
+npm run dev:ide
+```

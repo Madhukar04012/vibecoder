@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Send } from 'lucide-react';
 
 import type { AgentRunState, ChatMessageModel, IntegrationStatus } from '@/components/ide/types';
