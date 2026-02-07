@@ -3,27 +3,21 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { DottedSurface } from "@/components/ui/dotted-surface";
-import { Home, Sun, Moon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useTheme } from "@/contexts/ThemeContext";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Eye, EyeOff, Mail, Sparkles } from "lucide-react";
+import { AnimatedAuthLayout } from "@/components/animated-auth-layout";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Login() {
-  const { theme, toggleTheme } = useTheme();
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +25,7 @@ export default function Login() {
     setIsLoading(true);
     try {
       await login({ email, password });
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid email or password");
     } finally {
@@ -40,170 +34,119 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <DottedSurface className="opacity-90" />
-      <div
-        aria-hidden="true"
-        className={cn(
-          "pointer-events-none fixed inset-0 z-[1]",
-          "bg-[radial-gradient(ellipse_at_center,hsl(var(--foreground)/0.06),transparent_60%)]",
-          "blur-[15px]"
-        )}
-      />
-      <div
-        className={cn(
-          "pointer-events-none fixed inset-0 z-[2]",
-          theme === "dark"
-            ? "bg-gradient-to-b from-black/40 via-zinc-900/20 to-black/50"
-            : "bg-gradient-to-b from-white/40 via-zinc-100/20 to-white/50"
-        )}
-      />
-
-      <Link
-        to="/"
-        aria-label="Back to home"
-        className={cn(
-          "fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-lg",
-          "backdrop-blur-md border transition-colors",
-          theme === "dark"
-            ? "bg-white/10 hover:bg-white/20 border-white/20 text-white"
-            : "bg-black/5 hover:bg-black/10 border-gray-200 text-gray-900"
-        )}
-      >
-        <Home className="w-4 h-4" />
-        Home
-      </Link>
-
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={toggleTheme}
-        className={cn(
-          "fixed top-6 right-6 z-50 rounded-full backdrop-blur-lg",
-          theme === "dark"
-            ? "bg-black/30 border-white/10 hover:bg-black/40"
-            : "bg-white/80 border-gray-200/80 hover:bg-white"
-        )}
-        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      >
-        {theme === "dark" ? (
-          <Sun className="w-4 h-4 text-white" />
-        ) : (
-          <Moon className="w-4 h-4 text-gray-700" />
-        )}
-      </Button>
-
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
-        <Card
-          className={cn(
-            "w-full max-w-md backdrop-blur",
-            theme === "dark"
-              ? "bg-zinc-900/95 border-zinc-800"
-              : "bg-white/95 border-zinc-200"
-          )}
-        >
-          <CardHeader className="space-y-1">
-            <CardTitle
-              className={cn(
-                "text-2xl",
-                theme === "dark" ? "text-white" : "text-gray-900"
-              )}
-            >
-              Welcome back
-            </CardTitle>
-            <CardDescription
-              className={theme === "dark" ? "text-zinc-400" : "text-gray-500"}
-            >
-              Sign in to your VibeCober account
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div
-                  className={cn(
-                    "rounded-lg px-4 py-3 text-sm",
-                    theme === "dark" ? "bg-red-500/20 text-red-400" : "bg-red-50 text-red-600"
-                  )}
-                >
-                  {error}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label
-                  htmlFor="email"
-                  className={theme === "dark" ? "text-zinc-300" : "text-gray-600"}
-                >
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@vibecober.ai"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  className={cn(
-                    theme === "dark"
-                      ? "bg-zinc-800 border-zinc-700 text-white"
-                      : "bg-gray-50 border-gray-200 text-gray-900"
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="password"
-                  className={theme === "dark" ? "text-zinc-300" : "text-gray-600"}
-                >
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  className={cn(
-                    theme === "dark"
-                      ? "bg-zinc-800 border-zinc-700 text-white"
-                      : "bg-gray-50 border-gray-200 text-gray-900"
-                  )}
-                />
-              </div>
-
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    Signing in...
-                  </span>
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
-            </form>
-
-            <p
-              className={cn(
-                "text-sm text-center",
-                theme === "dark" ? "text-zinc-400" : "text-gray-500"
-              )}
-            >
-              Don't have an account?{" "}
-              <Link
-                to="/signup"
-                className={theme === "dark" ? "text-white hover:underline" : "text-gray-900 hover:underline"}
-              >
-                Sign up
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
+    <AnimatedAuthLayout
+      brandName="Vibecoder"
+      isTyping={isTyping}
+      showPassword={showPassword}
+      password={password}
+    >
+      <div className="text-center mb-10">
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Welcome back!</h1>
+        <p className="text-muted-foreground text-sm">Please enter your details</p>
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-sm font-medium">
+            Email
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@vibecober.ai"
+            value={email}
+            autoComplete="off"
+            onChange={(e) => setEmail(e.target.value)}
+            onFocus={() => setIsTyping(true)}
+            onBlur={() => setIsTyping(false)}
+            required
+            className="h-12 bg-background border-border/60 focus:border-primary"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-sm font-medium">
+            Password
+          </Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="h-12 pr-10 bg-background border-border/60 focus:border-primary"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showPassword ? (
+                <EyeOff className="size-5" />
+              ) : (
+                <Eye className="size-5" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="remember"
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
+            />
+            <Label
+              htmlFor="remember"
+              className="text-sm font-normal cursor-pointer"
+            >
+              Remember for 30 days
+            </Label>
+          </div>
+          <a
+            href="#"
+            className="text-sm text-primary hover:underline font-medium"
+          >
+            Forgot password?
+          </a>
+        </div>
+
+        {error && (
+          <div className="p-3 text-sm text-red-400 bg-red-950/20 border border-red-900/30 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          className="w-full h-12 text-base font-medium"
+          size="lg"
+          disabled={isLoading}
+        >
+          {isLoading ? "Signing in..." : "Log in"}
+        </Button>
+      </form>
+
+      <div className="mt-6">
+        <Button
+          variant="outline"
+          className="w-full h-12 bg-background border-border/60 hover:bg-accent"
+          type="button"
+        >
+          <Mail className="mr-2 size-5" />
+          Log in with Google
+        </Button>
+      </div>
+
+      <div className="text-center text-sm text-muted-foreground mt-8">
+        Don&apos;t have an account?{" "}
+        <Link to="/signup" className="text-foreground font-medium hover:underline">
+          Sign Up
+        </Link>
+      </div>
+    </AnimatedAuthLayout>
   );
 }

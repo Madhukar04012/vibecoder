@@ -54,3 +54,7 @@ export async function signup(data: SignupRequest): Promise<UserResponse> {
     body: JSON.stringify(data),
   });
 }
+
+export async function getMe(): Promise<UserResponse> {
+  return apiFetch<UserResponse>("/auth/me");
+}

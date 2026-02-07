@@ -41,11 +41,11 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
   if (!mounted) return null;
 
   return (
-    <div className={cn('fixed top-5 left-0 right-0 z-[9999]', className)}>
+    <div className={cn('fixed top-5 left-0 right-0 z-[9999] pointer-events-none', className)}>
       <div className="flex justify-center pt-6">
         <motion.div
           className={cn(
-            'flex items-center gap-3 backdrop-blur-lg py-2 px-2 rounded-full shadow-lg relative',
+            'flex items-center gap-3 backdrop-blur-lg py-2 px-2 rounded-full shadow-lg relative pointer-events-auto',
             isLight
               ? 'bg-white/80 border border-gray-200/80'
               : 'bg-black/50 border border-white/10'
