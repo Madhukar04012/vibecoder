@@ -1,34 +1,8 @@
 :root {
-  --atoms-sidebar-bg: #1f1f1f;
-  --atoms-sidebar-border: #2a2a2a;
+  --atoms-sidebar-bg: #111111;
+  --atoms-sidebar-border: #1e1e1e;
   --atoms-text-primary: #e5e5e5;
   --atoms-text-muted: #9a9a9a;
-  --atoms-input-bg: #262626;
-  --atoms-hover-bg: #333333;
-}
-
-.atoms-chat {
-  font-size: 13px;
-  line-height: 1.35;
-  color: #e5e5e5;
-}
-
-.atoms-muted {
-  color: #9a9a9a;
-}
-
-.atoms-processed {
-  color: #9a9a9a;
-  font-size: 12px;
-}
-
-.atoms-upgrade {
-  background: #2563eb;
-  opacity: 0.85;
-  font-size: 13px;
-  padding: 4px 10px;
-}
-
-.atoms-input::placeholder {
-  color: #7a7a7a;
+  --atoms-input-bg: #1a1a1a;
+  --atoms-hover-bg: #1e1e1e;
 }

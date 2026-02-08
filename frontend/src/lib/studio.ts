@@ -4,7 +4,6 @@
  */
 
 import { apiFetch } from "./api";
-import type { DiffPlan } from "./diff";
 
 // ============== Types (aligned with backend studio.py) ==============
 
@@ -64,8 +63,11 @@ export interface PlanResponse {
   plan: Plan;
 }
 
-// Phase 4.2: Diff Agent (canonical schema from lib/diff)
-export type { DiffPlan };
+// Phase 4.2: Diff Agent — minimal placeholder (lib/diff removed)
+export interface DiffPlan {
+  changes?: Array<{ path: string; content: string }>;
+  [key: string]: unknown;
+}
 
 export interface DiffPlanRequest {
   plan: Plan;

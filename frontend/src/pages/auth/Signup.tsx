@@ -24,7 +24,7 @@ export default function Signup() {
     setIsLoading(true);
     try {
       await signup({ email, password, name: name || undefined });
-      navigate("/dashboard");
+      navigate("/ide");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

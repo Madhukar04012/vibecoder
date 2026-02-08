@@ -25,7 +25,7 @@ export default function Login() {
     setIsLoading(true);
     try {
       await login({ email, password });
-      navigate("/dashboard");
+      navigate("/ide");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid email or password");
     } finally {

@@ -547,54 +547,32 @@ CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Send a message to the AI team and get responses"""
-    messages = []
-    
-    # Simulate Team Lead response
-    messages.append(ChatMessage(
-        agent="team_lead",
-        content=f"I understand you want to: \"{request.message}\"\n\nLet me create a plan for the team.",
-        type="text"
-    ))
-    
-    # Simulate Planner response
-    messages.append(ChatMessage(
-        agent="planner",
-        content="Creating execution plan:\n\n1. Analyze requirements\n2. Design architecture\n3. Implement changes\n4. Run tests\n5. Validate results",
-        type="text"
-    ))
-    
-    # Simulate Coder response with file change
-    if "auth" in request.message.lower() or "login" in request.message.lower():
-        messages.append(ChatMessage(
-            agent="coder",
-            content="I will implement authentication. Modifying:",
+    from backend.core.llm_client import nim_chat, ollama_chat
+
+    prompt = f"You are a helpful coding assistant. The user said: {request.message}\n\nRespond briefly and helpfully."
+
+    # 1. Try NVIDIA NIM (user's API key)
+    reply = nim_chat(prompt)
+
+    # 2. Fallback to Ollama
+    if not reply:
+        reply = ollama_chat(prompt)
+
+    if reply:
+        return ChatResponse(
+            messages=[ChatMessage(agent="assistant", content=reply, type="text")],
+            finished=True
+        )
+
+    # 3. Fallback when no AI available
+    return ChatResponse(
+        messages=[ChatMessage(
+            agent="assistant",
+            content=f"Sure! You said: \"{request.message}\". (Set NIM_API_KEY in .env for AI replies.)",
             type="text"
-        ))
-        messages.append(ChatMessage(
-            agent="coder",
-            content="backend/auth/routes.py",
-            type="file_change",
-            file_path="backend/auth/routes.py",
-            diff={
-                "before": "# Old auth code",
-                "after": "# New auth code with your requested changes"
-            }
-        ))
-    else:
-        messages.append(ChatMessage(
-            agent="coder",
-            content="I will implement the requested changes.",
-            type="text"
-        ))
-    
-    # Simulate Tester response
-    messages.append(ChatMessage(
-        agent="tester",
-        content="I've added test cases for the new functionality. All tests passing.",
-        type="text"
-    ))
-    
-    return ChatResponse(messages=messages, finished=True)
+        )],
+        finished=True
+    )
 
 @router.post("/apply", response_model=ApplyResponse)
 async def apply_change(request: ApplyRequest):

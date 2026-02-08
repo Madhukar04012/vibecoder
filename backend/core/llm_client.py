@@ -1,11 +1,18 @@
 """
-LLM Client - Interface to local Ollama for AI inference
-This is the ONLY file that knows about Ollama.
+LLM Client - Interface to Ollama and NVIDIA NIM for AI inference
 """
 
-import subprocess
-import json
 import os
+import subprocess
+
+# Ensure .env is loaded
+try:
+    from dotenv import load_dotenv
+    _root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    load_dotenv(os.path.join(_root, ".env"))
+except Exception:
+    pass
+import json
 import re
 import sys
 
@@ -81,4 +88,61 @@ def call_ollama(prompt: str, model: str = "mistral"):
         return None
     except Exception as e:
         print(f"[LLM] Unexpected error: {e}")
+        return None
+
+
+def ollama_chat(prompt: str, model: str | None = None) -> str | None:
+    """
+    Simple chat completion via Ollama HTTP API.
+    Returns the model's text response, or None if unavailable.
+    """
+    import requests
+    model = model or os.getenv("OLLAMA_CHAT_MODEL", "llama3.2")
+    url = "http://localhost:11434/api/generate"
+    try:
+        r = requests.post(
+            url,
+            json={"model": model, "prompt": prompt, "stream": False},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json().get("response", "").strip() or None
+    except Exception as e:
+        print(f"[LLM] Chat error: {e}")
+        return None
+
+
+def nim_chat(prompt: str) -> str | None:
+    """
+    Chat completion via NVIDIA NIM API (OpenAI-compatible).
+    Uses NIM_API_KEY and NIM_MODEL from env.
+    """
+    import requests
+    api_key = os.getenv("NIM_API_KEY", "").strip()
+    if not api_key:
+        return None
+    model = os.getenv("NIM_MODEL", "meta/llama-3.3-70b-instruct")
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    try:
+        r = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1024,
+            },
+            timeout=60,
+        )
+        r.raise_for_status()
+        data = r.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return content.strip() or None
+    except requests.exceptions.RequestException as e:
+        err = getattr(e, "response", None)
+        body = err.text if err else str(e)
+        print(f"[LLM] NIM chat error: {e} | {body[:200] if body else ''}")
+        return None
+    except Exception as e:
+        print(f"[LLM] NIM chat error: {e}")
         return None

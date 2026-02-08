@@ -1,11 +1,14 @@
+/**
+ * AtomsTopBar - IDE top bar with view switching and project controls
+ */
+
 import { useState } from "react";
 import {
-  Monitor,
-  Globe,
-  Terminal,
-  TerminalSquare,
-  Share2,
+  Code2, Globe, Terminal, Share2, Play, Sparkles,
+  PanelLeftClose, PanelLeft,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useIDEStore } from "@/stores/ide-store";
 
 export type TopBarActiveView = "editor" | "app" | "terminal";
 
@@ -14,8 +17,6 @@ export function AtomsTopBar({
   setView,
   sidebarVisible,
   onToggleSidebar,
-  terminalVisible,
-  onToggleTerminal,
   onPublish,
   projectName,
 }: {
@@ -26,109 +27,84 @@ export function AtomsTopBar({
   onPublish?: () => void;
   projectName?: string | null;
 }) {
-  // Active nav: whichever was last clicked shows icon+name pill; others show icon only
-  const [activeView, setActiveView] = useState<TopBarActiveView>("editor");
+  const aiStatus = useIDEStore((s) => s.aiStatus);
+  const aiFileProgress = useIDEStore((s) => s.aiFileProgress);
+  const fileCount = useIDEStore((s) => Object.keys(s.fileContents).length);
 
-  const handleSetView = (v: "editor" | "app") => {
-    setActiveView(v);
-    setView(v);
-  };
-
-  const handleTerminalClick = () => {
-    setActiveView("terminal");
-    setView("terminal");
-  };
+  const views: { id: TopBarActiveView; label: string; icon: React.ReactNode }[] = [
+    { id: "editor", label: "Code", icon: <Code2 size={14} /> },
+    { id: "app", label: "Preview", icon: <Globe size={14} /> },
+    { id: "terminal", label: "Shell", icon: <Terminal size={14} /> },
+  ];
 
   return (
     <header
-      className="atoms-header w-full flex items-center border-b text-[13px] [&_svg]:opacity-70 [&_button:hover_svg]:opacity-100"
-      style={{
-        background: "var(--atoms-charcoal)",
-        borderColor: "#2f2f2f",
-        color: "var(--atoms-pearl-white)",
-      }}
+      className="w-full flex items-center h-[42px] border-b text-[12px] select-none"
+      style={{ background: "#111", borderColor: "#1e1e1e", color: "#e5e5e5" }}
     >
-      {/* LEFT: Project info button */}
-      <div className="flex items-center gap-2">
-        <button className="h-9 pl-3 pr-4 rounded-lg bg-[#1f1f1f] hover:bg-[#262626] flex items-center gap-2 max-w-[240px] min-w-[180px] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]">
-          <Globe size={16} className="text-[#e5e5e5] shrink-0" />
-          <Monitor size={14} className="text-[#e5e5e5] shrink-0" />
-          <span className="truncate text-[#e5e5e5]">
-            {projectName ? `${projectName}${projectName.length > 18 ? '…' : ''}` : 'No project'}
+      {/* LEFT: Toggle + Project */}
+      <div className="flex items-center gap-1.5 pl-2">
+        <button
+          onClick={onToggleSidebar}
+          className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-[#1e1e1e] text-gray-400 hover:text-gray-200 transition-colors"
+          title={sidebarVisible ? "Hide sidebar" : "Show sidebar"}
+        >
+          {sidebarVisible ? <PanelLeftClose size={15} /> : <PanelLeft size={15} />}
+        </button>
+
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1a1a1a] border border-[#222]">
+          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="text-gray-300 font-medium truncate max-w-[160px]">
+            {projectName || "New Project"}
           </span>
-        </button>
-      </div>
+          {fileCount > 0 && (
+            <span className="text-[10px] text-gray-600 ml-1">{fileCount} files</span>
+          )}
+        </div>
 
-      {/* MIDDLE: Nav items – active shows icon+name (pill), inactive icon-only (circle) */}
-      <div className="flex-1 flex items-center justify-center gap-1 ml-6">
-        {/* App Viewer */}
-        {activeView === "app" ? (
-          <button
-            onClick={() => handleSetView("app")}
-            className="h-9 pl-3 pr-4 rounded-lg flex items-center gap-2 bg-[#3a3a3a] transition-all duration-200"
-          >
-            <Monitor size={16} className="shrink-0" />
-            <span>App Viewer</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => handleSetView("app")}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#333333] transition-all duration-200 hover:scale-110 active:scale-95"
-            aria-label="App Viewer"
-          >
-            <Monitor size={16} />
-          </button>
-        )}
-
-        {/* Editor */}
-        {activeView === "editor" ? (
-          <button
-            onClick={() => handleSetView("editor")}
-            className="h-9 pl-3 pr-4 rounded-lg flex items-center gap-2 bg-[#3a3a3a] transition-all duration-200"
-          >
-            <Terminal size={16} className="shrink-0" />
-            <span>Editor</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => handleSetView("editor")}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#333333] transition-all duration-200 hover:scale-110 active:scale-95"
-            aria-label="Editor"
-          >
-            <Terminal size={16} />
-          </button>
-        )}
-
-        {/* Terminal */}
-        {activeView === "terminal" ? (
-          <button
-            onClick={handleTerminalClick}
-            className="h-9 pl-3 pr-4 rounded-lg flex items-center gap-2 bg-[#3a3a3a] transition-all duration-200"
-          >
-            <TerminalSquare size={16} className="shrink-0" />
-            <span>Terminal</span>
-          </button>
-        ) : (
-          <button
-            onClick={handleTerminalClick}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#333333] transition-all duration-200 hover:scale-110 active:scale-95"
-            aria-label="Terminal"
-          >
-            <TerminalSquare size={16} />
-          </button>
+        {/* AI Status */}
+        {aiStatus !== 'idle' && aiStatus !== 'done' && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/15 text-blue-300 text-[11px]">
+            <Sparkles size={10} className="animate-pulse" />
+            {aiStatus === 'thinking' && "Thinking..."}
+            {aiStatus === 'generating' && `Generating ${aiFileProgress.current}/${aiFileProgress.total}`}
+            {aiStatus === 'streaming' && "Writing..."}
+          </div>
         )}
       </div>
 
-      {/* RIGHT: Share, Publish */}
-      <div className="flex items-center gap-2">
-        <button className="w-8 h-8 rounded-full hover:bg-[#333333] flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95" aria-label="Share">
-          <Share2 size={16} />
-        </button>
+      {/* CENTER: View Switcher */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center h-[28px] rounded-lg bg-[#1a1a1a] border border-[#222] overflow-hidden">
+          {views.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 h-full text-[12px] transition-all duration-150",
+                view === v.id
+                  ? "bg-[#2a2a2a] text-white"
+                  : "text-gray-500 hover:text-gray-300 hover:bg-[#1e1e1e]",
+              )}
+            >
+              {v.icon}
+              <span>{v.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* RIGHT: Actions */}
+      <div className="flex items-center gap-1.5 pr-3">
         <button
           onClick={onPublish}
-          className="h-[28px] px-4 rounded-lg bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-medium transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
+          className="flex items-center gap-1.5 h-[28px] px-3 rounded-lg bg-emerald-600/15 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-600/25 transition-colors text-[12px]"
         >
-          Publish
+          <Play size={12} />
+          Run
+        </button>
+        <button className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-[#1e1e1e] text-gray-500 hover:text-gray-300 transition-colors" title="Share">
+          <Share2 size={14} />
         </button>
       </div>
     </header>
