@@ -59,8 +59,8 @@ export default function Dashboard() {
         to="/"
         aria-label="Back to home"
         className={cn(
-          "fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-lg",
-          "backdrop-blur-md border transition-colors",
+          "fixed top-[max(1rem,env(safe-area-inset-top))] left-4 sm:left-6 z-50 flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg",
+          "backdrop-blur-md border transition-colors min-h-[44px] touch-manipulation",
           theme === "dark"
             ? "bg-white/10 hover:bg-white/20 border-white/20 text-white"
             : "bg-black/5 hover:bg-black/10 border-gray-200 text-gray-900"
@@ -75,7 +75,7 @@ export default function Dashboard() {
         size="icon"
         onClick={toggleTheme}
         className={cn(
-          "fixed top-6 right-6 z-50 rounded-full backdrop-blur-lg",
+          "fixed top-[max(1rem,env(safe-area-inset-top))] right-4 sm:right-6 z-50 rounded-full backdrop-blur-lg h-10 w-10 touch-manipulation",
           theme === "dark"
             ? "bg-black/30 border-white/10 hover:bg-black/40"
             : "bg-white/80 border-gray-200/80 hover:bg-white"
@@ -89,10 +89,10 @@ export default function Dashboard() {
         )}
       </Button>
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-20 sm:py-0">
         <Card
           className={cn(
-            "w-full max-w-md backdrop-blur",
+            "w-full max-w-md backdrop-blur mx-auto",
             theme === "dark"
               ? "bg-zinc-900/95 border-zinc-800"
               : "bg-white/95 border-zinc-200"
@@ -152,17 +152,17 @@ export default function Dashboard() {
               </div>
             )}
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 min-h-[44px] touch-manipulation"
                 onClick={handleLogout}
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Log out
               </Button>
-              <Link to="/">
-                <Button className="flex-1">
+              <Link to="/" className="flex-1">
+                <Button className="w-full min-h-[44px] touch-manipulation">
                   <Home className="w-4 h-4 mr-2" />
                   Go to app
                 </Button>

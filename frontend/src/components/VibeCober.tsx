@@ -24,6 +24,7 @@ import {
   Compass,
   CreditCard,
   Info,
+  Users,
 } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -151,10 +152,10 @@ const VibeCober: React.FC = () => {
     <motion.nav
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      className="fixed top-0 left-0 right-0 z-50 px-6 py-4"
+      className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 py-3 sm:py-4 pt-[env(safe-area-inset-top)]"
     >
       <div className="max-w-7xl mx-auto">
-        <div className="bg-background/80 backdrop-blur-xl border border-border rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
+        <div className="bg-background/80 backdrop-blur-xl border border-border rounded-full px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between shadow-lg">
           <div className="flex items-center gap-8">
             <button
               onClick={() => setCurrentPage('landing')}
@@ -208,8 +209,9 @@ const VibeCober: React.FC = () => {
             </Link>
           </div>
           <button
-            className="md:hidden"
+            className="md:hidden p-2 -m-2 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {mobileMenuOpen ? (
               <X className="w-5 h-5" />
@@ -315,8 +317,8 @@ const VibeCober: React.FC = () => {
           )}
         />
 
-        <section id="manifesto" className="relative z-10 min-h-screen flex items-center justify-center px-6 pt-32 pb-20">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
+        <section id="manifesto" className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 pt-28 sm:pt-36 md:pt-32 pb-12 sm:pb-20">
+          <div className="max-w-4xl mx-auto text-center space-y-6 sm:space-y-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -324,7 +326,7 @@ const VibeCober: React.FC = () => {
             >
               <h1
                 className={cn(
-                  'text-7xl md:text-8xl font-bold tracking-tight mb-6',
+                  'text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-4 sm:mb-6',
                   theme === 'dark' ? 'text-foreground' : 'text-[#333333]'
                 )}
               >
@@ -332,7 +334,7 @@ const VibeCober: React.FC = () => {
               </h1>
               <p
                 className={cn(
-                  'text-2xl md:text-3xl font-normal mb-12',
+                  'text-lg sm:text-xl md:text-2xl lg:text-3xl font-normal mb-8 sm:mb-12 px-2',
                   theme === 'dark' ? 'text-muted-foreground' : 'text-[#555555]'
                 )}
               >
@@ -344,7 +346,7 @@ const VibeCober: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="relative max-w-2xl mx-auto"
+              className="relative max-w-2xl mx-auto px-2 sm:px-0"
             >
               <div className="relative">
                 <Textarea
@@ -362,7 +364,7 @@ const VibeCober: React.FC = () => {
                   }}
                   placeholder={placeholder}
                   className={cn(
-                    'min-h-[120px] text-lg bg-background/80 backdrop-blur-xl border-border focus:border-primary transition-all resize-none pr-14',
+                    'min-h-[100px] sm:min-h-[120px] text-base sm:text-lg bg-background/80 backdrop-blur-xl border-border focus:border-primary transition-all resize-none pr-12 sm:pr-14 py-4 touch-manipulation',
                     theme === 'light' && 'placeholder:text-[#AAAAAA] bg-white border-[#e5e5e5]'
                   )}
                 />
@@ -371,7 +373,7 @@ const VibeCober: React.FC = () => {
                   disabled={!idea.trim()}
                   size="icon"
                   className={cn(
-                    'absolute bottom-4 right-4 rounded-full',
+                    'absolute bottom-3 right-3 sm:bottom-4 sm:right-4 rounded-full h-10 w-10 sm:h-11 sm:w-11 touch-manipulation',
                     theme === 'light' && 'bg-[#888888] text-white hover:bg-[#777777]'
                   )}
                 >
@@ -390,32 +392,32 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <section id="how-it-works" className="relative py-32 px-6">
+        <section id="how-it-works" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
           <div className="max-w-6xl mx-auto">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-foreground"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
             >
               How it works
             </motion.h2>
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
               {[
                 {
                   icon: Sparkles,
                   title: 'Analyze',
-                  desc: 'AI understands your idea and plans the architecture',
+                  desc: 'Team Lead Brain + Planner decide architecture (MetaGPT-style)',
                 },
                 {
                   icon: Code2,
                   title: 'Generate',
-                  desc: 'Creates production-ready code with best practices',
+                  desc: 'DB, Auth, Coder agents create production-ready code',
                 },
                 {
                   icon: Zap,
                   title: 'Run',
-                  desc: 'Get a fully functional project ready to deploy',
+                  desc: 'Tester + Deployer finish the pipeline. Ready to ship.',
                 },
               ].map((step, i) => (
                 <motion.div
@@ -425,10 +427,10 @@ const VibeCober: React.FC = () => {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.2 }}
                 >
-                  <Card className="p-8 bg-card border border-border shadow-sm hover:border-primary/50 transition-all">
-                    <step.icon className="w-12 h-12 text-primary mb-6" />
-                    <h3 className="text-2xl font-semibold mb-4 text-foreground">{step.title}</h3>
-                    <p className="text-muted-foreground">{step.desc}</p>
+                  <Card className="p-6 sm:p-8 bg-card border border-border shadow-sm hover:border-primary/50 transition-all">
+                    <step.icon className="w-10 h-10 sm:w-12 sm:h-12 text-primary mb-4 sm:mb-6" />
+                    <h3 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4 text-foreground">{step.title}</h3>
+                    <p className="text-muted-foreground text-sm sm:text-base">{step.desc}</p>
                   </Card>
                 </motion.div>
               ))}
@@ -436,17 +438,17 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <section id="discover" className="relative py-32 px-6 bg-muted/50">
+        <section id="discover" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-muted/50">
           <div className="max-w-6xl mx-auto">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-foreground"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
             >
               Why developers like it
             </motion.h2>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               {[
                 {
                   title: 'Production-first output',
@@ -472,12 +474,12 @@ const VibeCober: React.FC = () => {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
                 >
-                  <Card className="p-6 bg-card border border-border shadow-sm">
-                    <CheckCircle2 className="w-8 h-8 text-primary mb-4" />
-                    <h3 className="text-xl font-semibold mb-2 text-foreground">
+                  <Card className="p-5 sm:p-6 bg-card border border-border shadow-sm">
+                    <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-primary mb-3 sm:mb-4" />
+                    <h3 className="text-lg sm:text-xl font-semibold mb-2 text-foreground">
                       {feature.title}
                     </h3>
-                    <p className="text-muted-foreground">{feature.desc}</p>
+                    <p className="text-muted-foreground text-sm sm:text-base">{feature.desc}</p>
                   </Card>
                 </motion.div>
               ))}
@@ -485,17 +487,17 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <section id="pricing" className="relative py-32 px-6">
+        <section id="pricing" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
           <div className="max-w-6xl mx-auto">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-foreground"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
             >
               Simple pricing
             </motion.h2>
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
               {[
                 {
                   name: 'Free',
@@ -537,14 +539,14 @@ const VibeCober: React.FC = () => {
                   transition={{ delay: i * 0.1 }}
                 >
                   <Card
-                    className={`p-8 ${
+                    className={`p-6 sm:p-8 ${
                       plan.highlight
                         ? 'border-2 border-primary bg-primary/5'
                         : 'bg-card border border-border'
                     } shadow-sm`}
                   >
-                    <h3 className="text-2xl font-bold mb-2 text-foreground">{plan.name}</h3>
-                    <div className="text-4xl font-bold mb-6 text-foreground">
+                    <h3 className="text-xl sm:text-2xl font-bold mb-2 text-foreground">{plan.name}</h3>
+                    <div className="text-3xl sm:text-4xl font-bold mb-4 sm:mb-6 text-foreground">
                       {plan.price}
                       <span className="text-lg text-muted-foreground">/mo</span>
                     </div>
@@ -573,17 +575,17 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <section id="testimonials" className="relative py-32 px-6 bg-muted/50">
+        <section id="testimonials" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-muted/50">
           <div className="max-w-6xl mx-auto">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-foreground"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
             >
               Trusted by developers
             </motion.h2>
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
               {[
                 {
                   name: 'Alex Chen',
@@ -625,17 +627,17 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <section id="faq" className="relative py-32 px-6">
+        <section id="faq" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
           <div className="max-w-3xl mx-auto">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-center mb-20 text-foreground"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
             >
               FAQ
             </motion.h2>
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {[
                 {
                   q: 'How does local AI work?',
@@ -671,13 +673,13 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <section id="careers" className="relative py-32 px-6 bg-muted/50">
+        <section id="careers" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-muted/50">
           <div className="max-w-4xl mx-auto text-center">
             <motion.h2
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold mb-8 text-foreground"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-8 text-foreground"
             >
               Ready to build?
             </motion.h2>
@@ -685,7 +687,7 @@ const VibeCober: React.FC = () => {
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
-              className="text-xl text-muted-foreground mb-12"
+              className="text-base sm:text-lg md:text-xl text-muted-foreground mb-8 sm:mb-12 px-2"
             >
               Join thousands of developers shipping faster with Vibecoder
             </motion.p>
@@ -693,10 +695,10 @@ const VibeCober: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="flex flex-col sm:flex-row gap-4 justify-center"
+              className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-2"
             >
               <Link to="/signup">
-                <Button size="lg" className="text-lg px-8">
+                <Button size="lg" className="text-base sm:text-lg px-6 sm:px-8 w-full sm:w-auto min-h-[44px] touch-manipulation">
                   Get Started Free
                 </Button>
               </Link>
@@ -704,7 +706,7 @@ const VibeCober: React.FC = () => {
                 href="https://github.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'text-lg px-8 inline-flex')}
+                className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'text-base sm:text-lg px-6 sm:px-8 inline-flex w-full sm:w-auto justify-center min-h-[44px] touch-manipulation')}
               >
                 View on GitHub
               </a>
@@ -712,9 +714,9 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <footer id="contact" className="relative border-t border-border py-12 px-6 bg-background">
+        <footer id="contact" className="relative border-t border-border py-10 sm:py-12 px-4 sm:px-6 bg-background pb-[max(2.5rem,env(safe-area-inset-bottom))]">
           <div className="max-w-6xl mx-auto">
-            <div className="grid md:grid-cols-4 gap-8 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-6 sm:mb-8">
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-5 h-5 text-primary" />
@@ -789,7 +791,7 @@ const VibeCober: React.FC = () => {
               </div>
             </div>
             <Separator className="mb-8" />
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground text-center sm:text-left">
               <p>© 2024 Vibecoder. All rights reserved.</p>
               <div className="flex gap-6">
                 <a href="#" className="hover:text-foreground transition-colors">
@@ -810,7 +812,7 @@ const VibeCober: React.FC = () => {
   };
 
   const GeneratorPage = () => (
-    <div className="min-h-screen pt-32 pb-20 px-6 bg-background">
+    <div className="min-h-screen pt-24 sm:pt-32 pb-12 sm:pb-20 px-4 sm:px-6 bg-background">
       <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -818,18 +820,18 @@ const VibeCober: React.FC = () => {
           className="space-y-8"
         >
           <div>
-            <h1 className="text-4xl font-bold mb-4 text-foreground">Generate Project</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 text-foreground">Generate Project</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Describe your project and let AI build it for you.
             </p>
           </div>
 
-          <Card className="p-8 bg-card border border-border shadow-sm">
+          <Card className="p-5 sm:p-8 bg-card border border-border shadow-sm">
             <Textarea
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
               placeholder="Describe your project idea..."
-              className="min-h-[200px] text-lg mb-6 resize-none"
+              className="min-h-[160px] sm:min-h-[200px] text-base sm:text-lg mb-6 resize-none touch-manipulation"
             />
             <Button
               onClick={handleGenerate}
@@ -853,6 +855,42 @@ const VibeCober: React.FC = () => {
 
           {isGenerating && (
             <div className="space-y-4">
+              <Card className="p-6 bg-card border border-border shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <Users className="w-5 h-5 text-primary" />
+                  <span className="font-medium text-foreground">MetaGPT-style agent pipeline</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {[
+                    { name: 'Team Lead', status: 'active', icon: '🧠' },
+                    { name: 'Planner', status: 'pending', icon: '📋' },
+                    { name: 'DB Schema', status: 'pending', icon: '🗄️' },
+                    { name: 'Auth', status: 'pending', icon: '🔐' },
+                    { name: 'Coder', status: 'pending', icon: '⚙️' },
+                    { name: 'Tester', status: 'pending', icon: '🧪' },
+                    { name: 'Deployer', status: 'pending', icon: '🚀' },
+                  ].map((agent, i) => (
+                    <div
+                      key={agent.name}
+                      className={cn(
+                        'flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all',
+                        agent.status === 'active'
+                          ? 'bg-primary/10 border-primary text-foreground'
+                          : 'bg-muted/30 border-border text-muted-foreground'
+                      )}
+                    >
+                      <span>{agent.icon}</span>
+                      <span>{agent.name}</span>
+                      {agent.status === 'active' && (
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Code = SOP(Team) — roles collaborate sequentially
+                </p>
+              </Card>
               {[1, 2, 3].map((i) => (
                 <Card
                   key={i}
@@ -913,7 +951,7 @@ const VibeCober: React.FC = () => {
   };
 
   const PreviewPage = () => (
-    <div className="min-h-screen pt-32 pb-20 px-6 bg-background">
+    <div className="min-h-screen pt-24 sm:pt-32 pb-12 sm:pb-20 px-4 sm:px-6 bg-background">
       <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -921,15 +959,15 @@ const VibeCober: React.FC = () => {
           className="space-y-8"
         >
           <div>
-            <h1 className="text-4xl font-bold mb-4 text-foreground">Project Preview</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 text-foreground">Project Preview</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Review your project before building.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card className="p-8 bg-card border border-border shadow-sm">
-              <h2 className="text-2xl font-semibold mb-4 text-foreground">Project Summary</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <Card className="p-5 sm:p-8 bg-card border border-border shadow-sm">
+              <h2 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4 text-foreground">Project Summary</h2>
               <p className="text-muted-foreground mb-6">{projectData?.idea}</p>
 
               <h3 className="font-semibold mb-3 text-foreground">Detected Modules</h3>
@@ -952,9 +990,9 @@ const VibeCober: React.FC = () => {
               </div>
             </Card>
 
-            <Card className="p-8 bg-card border border-border shadow-sm">
-              <h2 className="text-2xl font-semibold mb-4 text-foreground">Project Structure</h2>
-              <div className="bg-muted/30 rounded-lg p-4 max-h-[500px] overflow-auto border border-border">
+            <Card className="p-5 sm:p-8 bg-card border border-border shadow-sm">
+              <h2 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4 text-foreground">Project Structure</h2>
+              <div className="bg-muted/30 rounded-lg p-3 sm:p-4 max-h-[350px] sm:max-h-[500px] overflow-auto border border-border">
                 {projectData?.structure.map((node, i) => (
                   <FolderTree key={i} node={node} />
                 ))}
@@ -962,12 +1000,12 @@ const VibeCober: React.FC = () => {
             </Card>
           </div>
 
-          <div className="flex gap-4">
-            <Button size="lg" variant="outline" className="flex-1">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <Button size="lg" variant="outline" className="flex-1 min-h-[44px] touch-manipulation">
               <Play className="w-5 h-5 mr-2" />
               Preview
             </Button>
-            <Button size="lg" onClick={handleBuild} className="flex-1">
+            <Button size="lg" onClick={handleBuild} className="flex-1 min-h-[44px] touch-manipulation">
               Build Project
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
@@ -991,7 +1029,7 @@ const VibeCober: React.FC = () => {
     const currentStep = Math.floor((buildProgress / 100) * steps.length);
 
     return (
-      <div className="min-h-screen pt-32 pb-20 px-6 bg-background">
+      <div className="min-h-screen pt-24 sm:pt-32 pb-12 sm:pb-20 px-4 sm:px-6 bg-background">
         <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -999,15 +1037,15 @@ const VibeCober: React.FC = () => {
             className="space-y-8"
           >
             <div>
-              <h1 className="text-4xl font-bold mb-4 text-foreground">Building Project</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 text-foreground">Building Project</h1>
+              <p className="text-muted-foreground text-sm sm:text-base">
                 {buildProgress === 100
                   ? 'Your project is ready!'
                   : 'Please wait while we build your project...'}
               </p>
             </div>
 
-            <Card className="p-8 bg-card border border-border shadow-sm">
+            <Card className="p-5 sm:p-8 bg-card border border-border shadow-sm">
               <div className="space-y-6">
                 <div>
                   <div className="flex justify-between text-sm mb-2 text-foreground">
@@ -1070,7 +1108,7 @@ const VibeCober: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="flex gap-4"
                   >
-                    <Button size="lg" className="flex-1">
+                    <Button size="lg" className="flex-1 min-h-[44px] touch-manipulation">
                       <Download className="w-5 h-5 mr-2" />
                       Download Project
                     </Button>
@@ -1078,6 +1116,7 @@ const VibeCober: React.FC = () => {
                       size="lg"
                       variant="outline"
                       onClick={() => setCurrentPage('landing')}
+                      className="min-h-[44px] touch-manipulation"
                     >
                       Create Another
                     </Button>
@@ -1099,9 +1138,10 @@ const VibeCober: React.FC = () => {
             href="#manifesto"
             onClick={() => setCurrentPage('landing')}
             className={cn(
-              'vibe-coder-logo fixed top-5 left-6 z-[9999] flex items-center',
-              'text-xl md:text-2xl uppercase tracking-tight',
-              'px-3 py-1.5 border-2 rounded-[2px]',
+              'vibe-coder-logo fixed z-[9999] flex items-center',
+              'top-[max(1rem,env(safe-area-inset-top))] left-4 sm:left-6',
+              'text-base sm:text-xl md:text-2xl uppercase tracking-tight',
+              'px-2.5 py-1 sm:px-3 sm:py-1.5 border-2 rounded-[2px]',
               'transition-colors select-none',
               theme === 'dark'
                 ? 'text-white border-white/90 hover:border-white'
@@ -1111,13 +1151,13 @@ const VibeCober: React.FC = () => {
             vibecoder
           </a>
           <AnimeNavBar items={ANIME_NAV_ITEMS} defaultActive="Home" />
-          <div className="fixed top-5 right-6 z-[9999] flex items-center gap-3">
+          <div className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 sm:right-6 z-[9999] flex items-center gap-2 sm:gap-3">
             <Button
               variant="outline"
               size="icon"
               onClick={toggleTheme}
               className={cn(
-                'rounded-full backdrop-blur-lg',
+                'rounded-full backdrop-blur-lg h-9 w-9 sm:h-10 sm:w-10 touch-manipulation',
                 theme === 'dark'
                   ? 'bg-black/30 border-white/10'
                   : 'bg-white/80 border-gray-200/80'
@@ -1134,11 +1174,12 @@ const VibeCober: React.FC = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                className={
+                className={cn(
+                  'touch-manipulation min-h-[44px] sm:min-h-0',
                   theme === 'dark'
                     ? 'text-white/80 hover:text-white hover:bg-white/10'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-                }
+                )}
               >
                 Login
               </Button>
@@ -1146,11 +1187,12 @@ const VibeCober: React.FC = () => {
             <Link to="/signup">
               <Button
                 size="sm"
-                className={
+                className={cn(
+                  'touch-manipulation min-h-[44px] sm:min-h-0 px-3 sm:px-4',
                   theme === 'dark'
                     ? 'bg-white text-black hover:bg-white/90'
                     : 'bg-gray-800 text-white hover:bg-gray-700'
-                }
+                )}
               >
                 Sign Up
               </Button>

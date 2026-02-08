@@ -1,0 +1,101 @@
+/**
+ * Atoms IDE — Cinematic dark theme
+ * Theme: deep black, charcoal, soft gold, pearl white
+ */
+
+:root {
+  /* Cinematic dark theme */
+  --atoms-deep-black: #0a0a0a;
+  --atoms-charcoal: #1a1a1a;
+  --atoms-charcoal-light: #252525;
+  --atoms-soft-gold: #c9a227;
+  --atoms-soft-gold-muted: #a67c00;
+  --atoms-pearl-white: #e8e8e8;
+  --atoms-pearl-white-muted: #9a9a9a;
+
+  /* Top bar */
+  --atoms-topbar-height: 48px;
+  --atoms-topbar-bg: #1a1a1a;
+  --atoms-topbar-border: #2a2a2a;
+
+  --atoms-text-primary: #e8e8e8;
+  --atoms-text-muted: #9a9a9a;
+
+  --atoms-pill-bg: #1f1f1f;
+  --atoms-pill-active: #2a2a2a;
+  --atoms-pill-hover: #333333;
+
+  /* Sidebar */
+  --atoms-sidebar-width: 260px;
+  --atoms-sidebar-min-width: 240px;
+  --atoms-sidebar-max-width: 280px;
+  --atoms-sidebar-bg: #141414;
+  --atoms-sidebar-border: #252525;
+
+  /* Bottom input (chat) */
+  --atoms-input-height: 40px;
+  --atoms-input-bg: #0d0d0d;
+
+  /* Segmented pill */
+  --atoms-pill-height: 28px;
+  --atoms-pill-active-bg: #2a2a2a;
+  --atoms-pill-hover-bg: #333;
+
+  /* App background - deep black / charcoal */
+  --atoms-app-bg-start: #0a0a0a;
+  --atoms-app-bg-end: #141414;
+  --atoms-editor-bg: #0d0d0d;
+
+  /* Empty state */
+  --atoms-empty-text-color: #9a9a9a;
+  --atoms-empty-text-size: 14px;
+  --atoms-empty-text-opacity: 0.6;
+}
+
+.atoms-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--atoms-text-muted);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.atoms-sidebar {
+  width: 260px;
+  background: #1f1f1f;
+  border-right: 1px solid #2a2a2a;
+}
+
+.atoms-tree-item {
+  height: 24px;
+  font-size: 13px;
+  padding: 0 8px;
+}
+
+.atoms-input-wrapper {
+  border-top: 1px solid #2a2a2a;
+  background: #1c1c1c;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.atoms-input {
+  height: 40px;
+  font-size: 13px;
+  border: none;
+}
+
+.atoms-header {
+  height: 44px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #2f2f2f;
+}
+
+/* Atoms pill hover — use with segmented control buttons */
+.atoms-pill-btn:hover {
+  background-color: var(--atoms-pill-hover-bg) !important;
+}

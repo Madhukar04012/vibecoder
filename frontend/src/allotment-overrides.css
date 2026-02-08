@@ -1,0 +1,48 @@
+/* Wider resize bar for easier dragging */
+:root {
+  --sash-size: 20px;
+  --sash-hover-size: 12px;
+  --separator-border: rgba(14, 99, 156, 0.5);
+}
+
+/* CRITICAL: Prevent black strip when dragging panel dividers.
+ * Flex/position children need min-width: 0 to shrink; without it the browser
+ * creates a "dead zone" (black gap) between panels. */
+[class*="splitViewContainer"] {
+  min-width: 0;
+  overflow: hidden;
+}
+
+[class*="splitViewView"] {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+/* CRITICAL: sashContainer must sit above panes so dividers are draggable */
+[class*="sashContainer"] {
+  z-index: 100 !important;
+}
+
+/* Sash: easy to grab, clear resize cursor, visible drag handle */
+[class*="sash-module_sash"] {
+  user-select: none;
+  z-index: 100 !important;
+  cursor: col-resize !important;
+  background: rgba(255, 255, 255, 0.04);
+}
+[class*="sash-module_sash"]:hover,
+[class*="sash-module_sash"][class*="active"] {
+  background: rgba(14, 99, 156, 0.25);
+}
+
+/* Fill sash/resize area - match sidebar so no black strip shows through */
+[class*="splitView"],
+[class*="sashContainer"] {
+  background: var(--atoms-sidebar-bg) !important;
+}
+
+/* NovaIDE allotment - ensure full coverage, no gaps */
+.nova-ide-allotment [class*="splitViewView"] {
+  background: transparent;
+}

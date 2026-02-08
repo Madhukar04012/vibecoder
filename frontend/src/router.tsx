@@ -5,6 +5,7 @@ import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
 import Dashboard from "@/pages/Dashboard";
 import VibeCober from "@/components/VibeCober";
+import NovaIDE from "@/components/NovaIDE";
 
 export const router = createBrowserRouter([
   {
@@ -16,7 +17,8 @@ export const router = createBrowserRouter([
       </ThemeProvider>
     ),
     children: [
-      { path: "/", element: <VibeCober /> },
+      { path: "/", element: <NovaIDE /> },
+      { path: "/home", element: <VibeCober /> },
       { path: "/dashboard", element: <Dashboard /> },
       { path: "/login", element: <Login /> },
       { path: "/signup", element: <Signup /> },

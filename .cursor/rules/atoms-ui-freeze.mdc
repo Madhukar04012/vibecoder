@@ -1,0 +1,53 @@
+---
+description: Atoms IDE UI freeze — no visual/behavioral changes to NovaIDE
+globs: frontend/src/components/NovaIDE.tsx,frontend/src/atoms-ide-layout.css
+alwaysApply: false
+---
+
+# Atoms IDE UI — FROZEN
+
+The NovaIDE UI matches Atoms pixel-for-pixel. Do not change without explicit approval.
+
+## Layout invariants (locked in atoms-ide-layout.css)
+
+- Top bar: 44px height, 8px 12px padding
+- Sidebar: 260px width, min 240, max 280
+- Segmented pill: 28px height
+- Bottom input: 40px height
+
+All layout values MUST use CSS variables from `atoms-ide-layout.css`. Do not hardcode layout values in NovaIDE.
+
+## "No new text" guard
+
+Do NOT add to NovaIDE or its direct children:
+
+- Onboarding copy
+- Helper text
+- Tooltips (except aria-labels for accessibility)
+- Empty-state marketing
+- "Ask the AI…" in the editor
+- Example buttons
+- AI tips
+- Status text
+- Agent explanations
+- Welcome messages
+
+The only user-facing text in the IDE shell:
+
+- Top bar: "NOVA AI Assistant", "Editor", "App"
+- Sidebar input placeholder: "Ask AI…"
+- Empty editor: "Select a file" (14px, 0.4 opacity, centered)
+
+## Do NOT add
+
+- Animations
+- Fade-ins
+- Placeholders beyond "Select a file"
+- "Smart" empty states
+- New modals or dialogs (except existing IntentPreviewPanel, DiffReviewPanel)
+
+## Changes allowed
+
+- Functionality inside the shell (file creation, keyboard shortcuts, preview wiring)
+- Bug fixes that preserve visual parity
+- Accessibility improvements (aria-labels, focus management)

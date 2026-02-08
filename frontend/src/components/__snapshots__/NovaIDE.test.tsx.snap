@@ -1,0 +1,10 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`NovaIDE > empty editor state snapshot (structure lock) 1`] = `
+{
+  "emptyHint": true,
+  "hasAside": true,
+  "hasHeader": true,
+  "headerText": "New ProjectEditorPublish",
+}
+`;

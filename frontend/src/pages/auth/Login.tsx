@@ -40,8 +40,8 @@ export default function Login() {
       showPassword={showPassword}
       password={password}
     >
-      <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Welcome back!</h1>
+      <div className="text-center mb-8 sm:mb-10">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">Welcome back!</h1>
         <p className="text-muted-foreground text-sm">Please enter your details</p>
       </div>
 
@@ -122,7 +122,7 @@ export default function Login() {
 
         <Button
           type="submit"
-          className="w-full h-12 text-base font-medium"
+          className="w-full h-12 text-base font-medium touch-manipulation"
           size="lg"
           disabled={isLoading}
         >
@@ -133,7 +133,7 @@ export default function Login() {
       <div className="mt-6">
         <Button
           variant="outline"
-          className="w-full h-12 bg-background border-border/60 hover:bg-accent"
+          className="w-full h-12 bg-background border-border/60 hover:bg-accent touch-manipulation"
           type="button"
         >
           <Mail className="mr-2 size-5" />
