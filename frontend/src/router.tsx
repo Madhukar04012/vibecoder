@@ -1,4 +1,6 @@
 import { createBrowserRouter, Outlet } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Login from "@/pages/auth/Login";
@@ -13,6 +15,8 @@ export const router = createBrowserRouter([
       <ThemeProvider>
         <AuthProvider>
           <Outlet />
+          <Analytics />
+          <SpeedInsights />
         </AuthProvider>
       </ThemeProvider>
     ),
