@@ -3,7 +3,10 @@ VibeCober Studio API
 Endpoints for the IDE + AI Team workspace
 """
 
+import logging
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from typing import Optional, List, Literal, Dict
 import os
@@ -208,7 +211,7 @@ def build_file_tree(path: str, base_path: str = "") -> List[FileNode]:
                     type="file"
                 ))
     except Exception as e:
-        pass
+        logger.warning("build_file_tree failed for %s: %s", path, e)
     return result
 
 

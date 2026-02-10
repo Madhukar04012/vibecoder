@@ -1,5 +1,3 @@
-@import "allotment/dist/style.css";
-@import "./allotment-overrides.css";
 @import "./atoms-ide-layout.css";
 @import "./atoms-chat.css";
 

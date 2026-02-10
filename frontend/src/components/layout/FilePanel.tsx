@@ -1,15 +1,21 @@
 /**
- * FilePanel - Dynamic File Tree with real-time AI creation indicators
- * Files appear instantly as AI creates them
+ * FilePanel - ATMOS Mode: Read-Only File Tree
+ * 
+ * ATMOS Rules:
+ * - NO new file button
+ * - NO file creation dialog
+ * - Files ONLY appear via AI generation
+ * - User can click to VIEW files (read-only)
  */
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import {
   FolderTree, File, FolderOpen, Folder, ChevronRight, ChevronDown,
-  Plus, MoreHorizontal, Sparkles, Trash2,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIDEStore } from "@/stores/ide-store";
+import { useState } from "react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -147,38 +153,13 @@ function TreeNodeItem({ node, level }: { node: TreeNode; level: number }) {
   );
 }
 
-// ─── New File Dialog ────────────────────────────────────────────────────────
-
-function NewFileInput({ onSubmit, onCancel }: { onSubmit: (name: string) => void; onCancel: () => void }) {
-  const [value, setValue] = useState("");
-  return (
-    <div className="px-3 py-1.5">
-      <input
-        autoFocus
-        className="w-full bg-[#1a1a1a] border border-blue-500/30 rounded px-2 py-1 text-[12px] text-gray-200 outline-none"
-        placeholder="path/to/file.ts"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && value.trim()) onSubmit(value.trim());
-          if (e.key === 'Escape') onCancel();
-        }}
-        onBlur={onCancel}
-      />
-    </div>
-  );
-}
-
 // ─── FilePanel ──────────────────────────────────────────────────────────────
 
 export default function FilePanel() {
   const fileContents = useIDEStore((s) => s.fileContents);
   const fileStatuses = useIDEStore((s) => s.fileStatuses);
-  const createFile = useIDEStore((s) => s.createFile);
-  const openFile = useIDEStore((s) => s.openFile);
   const aiStatus = useIDEStore((s) => s.aiStatus);
   const aiFileProgress = useIDEStore((s) => s.aiFileProgress);
-  const [showNewFile, setShowNewFile] = useState(false);
 
   const tree = useMemo(
     () => buildTree(Object.keys(fileContents), fileStatuses),
@@ -188,12 +169,14 @@ export default function FilePanel() {
   const fileCount = Object.keys(fileContents).length;
 
   return (
-    <div className="flex flex-col h-full w-full min-w-0 min-h-0 overflow-hidden" style={{ background: "#111" }}>
-      {/* Header */}
-      <div className="shrink-0 px-3 py-2 flex items-center gap-2 text-[12px] text-gray-400 border-b border-[#1e1e1e]">
-        <FolderTree size={13} className="text-gray-500" />
-        <span className="font-medium">Explorer</span>
-        <span className="ml-auto text-[11px] text-gray-600">{fileCount}</span>
+    <div className="flex flex-col h-full w-full min-w-0 min-h-0 overflow-hidden" style={{ background: "#0b0b0b" }}>
+      {/* Header — NO new file button */}
+      <div className="shrink-0 px-3 py-2 flex items-center gap-2 text-[11px] text-white/60 border-b border-[#1a1a1a]">
+        <FolderTree size={13} />
+        <span className="font-medium uppercase tracking-wider">Explorer</span>
+        {fileCount > 0 && (
+          <span className="ml-auto text-white/30">{fileCount}</span>
+        )}
 
         {/* AI progress */}
         {aiStatus === 'generating' && (
@@ -202,40 +185,20 @@ export default function FilePanel() {
             {aiFileProgress.current}/{aiFileProgress.total}
           </span>
         )}
-
-        {/* New file button */}
-        <button
-          onClick={() => setShowNewFile(true)}
-          className="p-1 rounded hover:bg-[#2a2a2a] text-gray-500 hover:text-gray-300 transition-colors"
-          title="New file"
-        >
-          <Plus size={13} />
-        </button>
       </div>
 
-      {/* New file input */}
-      {showNewFile && (
-        <NewFileInput
-          onSubmit={(name) => {
-            createFile(name, "");
-            openFile(name);
-            setShowNewFile(false);
-          }}
-          onCancel={() => setShowNewFile(false)}
-        />
-      )}
-
-      {/* Tree */}
+      {/* Tree — view only, no create/rename/delete */}
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-1 overscroll-contain">
         {tree.length > 0 ? (
           tree.map((node) => (
             <TreeNodeItem key={node.id} node={node} level={0} />
           ))
         ) : (
-          <div className="px-4 py-8 text-center text-gray-600 text-[12px]">
-            No files yet.
-            <br />
-            <span className="text-gray-500">Ask the AI to create a project.</span>
+          <div className="flex flex-col items-center justify-center h-full px-4 text-center">
+            <div className="text-white/20 mb-2">
+              <FolderOpen size={28} strokeWidth={1.5} />
+            </div>
+            <p className="text-[12px] text-white/40">No files yet</p>
           </div>
         )}
       </div>

@@ -844,3 +844,78 @@ async def atoms_endpoint(body: AtomsRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )
+
+
+# ─── Phase-2: Diagram Acknowledgment ─────────────────────────────────────────
+
+# Global engine instance tracking for diagram acknowledgment
+_active_engines: Dict[str, "AtomsEngine"] = {}
+
+
+class AcknowledgeDiagramResponse(BaseModel):
+    success: bool
+    message: str
+
+
+@router.post("/engine/acknowledge-diagram", response_model=AcknowledgeDiagramResponse)
+async def acknowledge_diagram(run_id: str = ""):
+    """
+    Acknowledge a planning diagram.
+    
+    Must be called before execution can proceed when a Mermaid diagram
+    is detected in the roadmap.
+    """
+    from backend.engine.atoms_engine import AtomsEngine
+    from backend.engine.events import get_event_emitter, EngineEventType
+    
+    # Emit acknowledgment event globally (for any listening engines)
+    emitter = get_event_emitter()
+    emitter.emit(EngineEventType.DIAGRAM_ACKNOWLEDGED, {"run_id": run_id})
+    
+    return AcknowledgeDiagramResponse(
+        success=True,
+        message="Diagram acknowledged. Execution can now proceed."
+    )
+
+
+# ─── Phase-2: Engine Events Endpoint ─────────────────────────────────────────
+
+class EventsResponse(BaseModel):
+    events: list
+    total: int
+
+
+@router.get("/engine/events", response_model=EventsResponse)
+async def get_engine_events(limit: int = 50, event_type: str = ""):
+    """
+    Get recent engine events.
+    
+    Useful for debugging and monitoring agent activity.
+    """
+    from backend.engine.events import get_event_emitter, EngineEventType
+    
+    emitter = get_event_emitter()
+    
+    # Filter by event type if specified
+    filter_type = None
+    if event_type:
+        try:
+            filter_type = EngineEventType(event_type)
+        except ValueError:
+            pass
+    
+    events = emitter.get_history(event_type=filter_type, limit=limit)
+    
+    # Convert to serializable format
+    events_data = [
+        {
+            "type": e.type.value,
+            "payload": e.payload,
+            "timestamp": e.timestamp.isoformat(),
+            "run_id": e.run_id,
+        }
+        for e in events
+    ]
+    
+    return EventsResponse(events=events_data, total=len(events_data))
+

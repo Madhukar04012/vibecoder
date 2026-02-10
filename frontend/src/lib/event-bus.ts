@@ -34,6 +34,7 @@ export type AtmosEventType =
   | 'AI_FILE_DELTA'
   | 'AI_FILE_COMPLETE'
   | 'AI_MESSAGE'
+  | 'AI_MESSAGE_TOKEN'
   | 'AI_ERROR'
   | 'AI_DONE'
   // Execution
@@ -50,7 +51,12 @@ export type AtmosEventType =
   | 'VIEW_SWITCH'
   // Project
   | 'PROJECT_CREATED'
-  | 'PROJECT_RESET';
+  | 'PROJECT_RESET'
+  // ATMOS (AI-Only)
+  | 'ATMOS_PHASE_CHANGE'
+  | 'ATMOS_STATUS'
+  | 'ATMOS_ERROR_FIXING'
+  | 'ATMOS_DONE';
 
 // ─── Event Payloads ─────────────────────────────────────────────────────────
 

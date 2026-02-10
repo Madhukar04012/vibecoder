@@ -1,6 +1,11 @@
 """Database utility - Check and create default user"""
 import sys
-sys.path.insert(0, 'c:/Users/annam/vibecober')
+from pathlib import Path
+
+# Add project root to path
+_ROOT = Path(__file__).resolve().parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 from backend.database import SessionLocal
 from backend.models.user import User

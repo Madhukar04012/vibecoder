@@ -9,7 +9,6 @@ Safety: sandboxed to generated_projects/demo/ directory.
 """
 
 import subprocess
-import os
 from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -89,4 +88,3 @@ def write_file(body: WriteRequest):
         return WriteResponse(success=True)
     except Exception as e:
         return WriteResponse(success=False, error=str(e))
-        return RunResponse(stdout="", stderr=str(e), exitCode=1)

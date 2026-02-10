@@ -95,17 +95,12 @@ docker-compose up --build
 # Terminal 1 (API)
 uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 
-# Terminal 2 (Landing page)
+# Terminal 2 (Frontend — Vite + React)
 cd frontend
 npm run dev
-
-# IDE UI (Next.js)
-# npm run dev:ide
 ```
 
-Notes:
-
-- The default helper script `start-frontend.bat` starts `frontend`.
+**Helper scripts:** `start-backend.bat`, `start-frontend.bat`, `start.bat`
 
 ---
 
@@ -283,6 +278,12 @@ pytest -v
 # Specific test file
 pytest tests/test_auth.py
 ```
+
+---
+
+## 📁 Project Structure
+
+See **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** for a directory map, entry points, and what each module does.
 
 ---
 

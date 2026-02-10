@@ -1,4 +1,4 @@
-# VibeCoder Login Quick Start Guide
+# VibeCober Login Quick Start Guide
 
 ## ✅ Status: Backend is WORKING!
 
@@ -11,7 +11,7 @@ The authentication system is fully functional. If you're having login issues, fo
 ### 1. **Start the Backend** (if not already running)
 ```powershell
 # From project root
-C:/Users/annam/vibecober/.venv/Scripts/python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### 2. **Start the Frontend** (if not already running)
@@ -27,9 +27,7 @@ npm run dev
   - Email: `admin@test.com`
   - Password: `admin123`
 
-- **Your Existing Accounts:**
-  - annammadhukarreddy53@gmail.com
-  - annammadhukarreddy54@gmail.com
+- **Your Accounts:** Use any email you've registered with.
 
 ---
 
@@ -61,15 +59,9 @@ You should see:
 {"status":"VibeCober API running","version":"0.6.1"}
 ```
 
-#### 4. **Test Login via API**
-Run the test script:
+#### 4. **Check Database**
 ```powershell
-C:/Users/annam/vibecober/.venv/Scripts/python.exe test_frontend_login.py
-```
-
-#### 5. **Check Database**
-```powershell
-C:/Users/annam/vibecober/.venv/Scripts/python.exe check_db.py
+python check_db.py
 ```
 
 ---
@@ -81,8 +73,6 @@ C:/Users/annam/vibecober/.venv/Scripts/python.exe check_db.py
 | admin@test.com | admin123 | Default test account |
 | test@example.com | testpass123 | Created during testing |
 | frontendtest@example.com | Test123! | Created during testing |
-| annammadhukarreddy53@gmail.com | (your password) | Your account |
-| annammadhukarreddy54@gmail.com | (your password) | Your account |
 
 ---
 
@@ -100,7 +90,7 @@ C:/Users/annam/vibecober/.venv/Scripts/python.exe check_db.py
 ### Issue: "Cannot connect to server"
 **Solution:** Backend not running on port 8000
 ```powershell
-C:/Users/annam/vibecober/.venv/Scripts/python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### Issue: "Invalid email or password"
@@ -142,9 +132,7 @@ localStorage.clear();
 
 ## 📞 Need Help?
 
-1. Check the test scripts output:
-   - `test_frontend_login.py` - Tests API directly
-   - `check_db.py` - Shows database users
+1. Run `python check_db.py` to see database users
 
 2. Check browser Network tab (F12 → Network) to see actual requests
 

@@ -1,5 +1,6 @@
 /**
- * EditorCanvas - Monaco Editor with LIVE code writing
+ * EditorCanvas - Monaco Editor (READ-ONLY)
+ * ATMOS mode: AI writes code, user reads it
  * Characters appear one by one as the AI types them — Cursor-style
  */
 
@@ -38,17 +39,16 @@ export function EditorCanvas({ file }: EditorCanvasProps) {
   const activeFile = file ?? storeActiveFile;
   const aiCurrentFile = useIDEStore((s) => s.aiCurrentFile);
   const aiStatus = useIDEStore((s) => s.aiStatus);
-  const fileStatuses = useIDEStore((s) => s.fileStatuses);
+  const fileLiveWriting = useIDEStore((s) => s.fileLiveWriting);
 
   const content = useIDEStore((s) =>
     activeFile ? s.fileContents[activeFile] ?? "" : ""
   );
-  const updateFileContent = useIDEStore((s) => s.updateFileContent);
 
   const editorRef = useRef<any>(null);
   const prevContentLenRef = useRef<number>(0);
 
-  const isLiveWriting = activeFile ? fileStatuses[activeFile]?.isLiveWriting : false;
+  const isLiveWriting = activeFile ? Boolean(fileLiveWriting?.[activeFile]) : false;
   const isAIFile = aiStatus === 'generating' && aiCurrentFile === activeFile;
 
   // ── Auto-scroll to bottom as content grows (live writing effect) ──
@@ -60,10 +60,8 @@ export function EditorCanvas({ file }: EditorCanvasProps) {
 
     const newLen = content.length;
     if (newLen > prevContentLenRef.current) {
-      // Scroll to end of file
       const lastLine = model.getLineCount();
-      editor.revealLine(lastLine, 1); // 1 = smooth scroll
-      // Move cursor to the end
+      editor.revealLine(lastLine, 1);
       const lastCol = model.getLineMaxColumn(lastLine);
       editor.setPosition({ lineNumber: lastLine, column: lastCol });
     }
@@ -79,11 +77,8 @@ export function EditorCanvas({ file }: EditorCanvasProps) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4" style={{ background: '#0d0d0d' }}>
         <div className="flex flex-col items-center gap-3 opacity-40">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-600">
-            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-            <polyline points="13 2 13 9 20 9" />
-          </svg>
-          <span className="text-[14px] text-gray-600">Select a file to edit</span>
+          <Sparkles size={32} className="text-blue-500/60" />
+          <span className="text-[14px] text-gray-600">AI will write code here</span>
         </div>
       </div>
     );
@@ -106,11 +101,6 @@ export function EditorCanvas({ file }: EditorCanvasProps) {
         theme="vs-dark"
         language={getLanguage(activeFile)}
         value={content}
-        onChange={(value) => {
-          if (!isLiveWriting) {
-            updateFileContent(activeFile, value ?? "");
-          }
-        }}
         onMount={handleMount}
         options={{
           fontSize: 13,
@@ -127,7 +117,7 @@ export function EditorCanvas({ file }: EditorCanvasProps) {
           bracketPairColorization: { enabled: true },
           guides: { bracketPairs: true, indentation: true },
           wordWrap: 'on',
-          readOnly: isLiveWriting,
+          readOnly: true,  // ATMOS: Always read-only
           tabSize: 2,
           suggest: { showWords: false },
           overviewRulerBorder: false,

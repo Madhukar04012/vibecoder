@@ -1,40 +1,39 @@
 /**
- * AtomsTopBar - IDE top bar with view switching and project controls
+ * AtomsTopBar - ATMOS Mode: Indicator-Only Top Bar
+ * 
+ * ATMOS Rules:
+ * - NO Run button (AI runs everything)
+ * - NO Share button
+ * - View tabs are indicators only (switch view, don't trigger execution)
+ * - Shows ATMOS phase badge instead of AI status
  */
 
-import { useState } from "react";
-import {
-  Code2, Globe, Terminal, Share2, Play, Sparkles,
-  PanelLeftClose, PanelLeft,
-} from "lucide-react";
+import { Code2, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useIDEStore } from "@/stores/ide-store";
+import { useAtmosStore, PHASE_DISPLAY } from "@/lib/atmos-state";
+import AccountHoverPanel from "./AccountHoverPanel";
+import { useState } from "react";
 
-export type TopBarActiveView = "editor" | "app" | "terminal";
+export type TopBarActiveView = "editor" | "app";
 
 export function AtomsTopBar({
   view,
   setView,
-  sidebarVisible,
-  onToggleSidebar,
-  onPublish,
   projectName,
 }: {
-  view: "editor" | "app" | "terminal";
-  setView: (v: "editor" | "app" | "terminal") => void;
-  sidebarVisible?: boolean;
-  onToggleSidebar?: () => void;
-  onPublish?: () => void;
+  view: "editor" | "app";
+  setView: (v: "editor" | "app") => void;
   projectName?: string | null;
 }) {
-  const aiStatus = useIDEStore((s) => s.aiStatus);
-  const aiFileProgress = useIDEStore((s) => s.aiFileProgress);
-  const fileCount = useIDEStore((s) => Object.keys(s.fileContents).length);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const phase = useAtmosStore((s) => s.phase);
+  const statusMessage = useAtmosStore((s) => s.statusMessage);
+
+  const phaseInfo = PHASE_DISPLAY[phase];
 
   const views: { id: TopBarActiveView; label: string; icon: React.ReactNode }[] = [
     { id: "editor", label: "Code", icon: <Code2 size={14} /> },
     { id: "app", label: "Preview", icon: <Globe size={14} /> },
-    { id: "terminal", label: "Shell", icon: <Terminal size={14} /> },
   ];
 
   return (
@@ -42,38 +41,56 @@ export function AtomsTopBar({
       className="w-full flex items-center h-[42px] border-b text-[12px] select-none"
       style={{ background: "#111", borderColor: "#1e1e1e", color: "#e5e5e5" }}
     >
-      {/* LEFT: Toggle + Project */}
-      <div className="flex items-center gap-1.5 pl-2">
-        <button
-          onClick={onToggleSidebar}
-          className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-[#1e1e1e] text-gray-400 hover:text-gray-200 transition-colors"
-          title={sidebarVisible ? "Hide sidebar" : "Show sidebar"}
-        >
-          {sidebarVisible ? <PanelLeftClose size={15} /> : <PanelLeft size={15} />}
-        </button>
+      {/* LEFT: App Icon + Project Info */}
+      <div className="flex items-center gap-2 pl-2">
 
+        {/* APP / ACCOUNT ICON */}
+        <div
+          className="relative"
+          onMouseEnter={() => setAccountOpen(true)}
+          onMouseLeave={() => setAccountOpen(false)}
+        >
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center cursor-pointer text-white font-bold hover:scale-105 transition-transform shadow-md shadow-purple-500/20">
+            ⚛
+          </div>
+          {accountOpen && <AccountHoverPanel />}
+        </div>
+
+        {/* Project Badge */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1a1a1a] border border-[#222]">
-          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+          <div
+            className="w-2 h-2 rounded-full transition-colors"
+            style={{ backgroundColor: phaseInfo.color }}
+          />
           <span className="text-gray-300 font-medium truncate max-w-[160px]">
             {projectName || "New Project"}
           </span>
-          {fileCount > 0 && (
-            <span className="text-[10px] text-gray-600 ml-1">{fileCount} files</span>
-          )}
         </div>
 
-        {/* AI Status */}
-        {aiStatus !== 'idle' && aiStatus !== 'done' && (
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/15 text-blue-300 text-[11px]">
-            <Sparkles size={10} className="animate-pulse" />
-            {aiStatus === 'thinking' && "Thinking..."}
-            {aiStatus === 'generating' && `Generating ${aiFileProgress.current}/${aiFileProgress.total}`}
-            {aiStatus === 'streaming' && "Writing..."}
+        {/* ATMOS Phase Badge */}
+        {phase !== 'idle' && (
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px]"
+            style={{
+              backgroundColor: `${phaseInfo.color}15`,
+              borderColor: `${phaseInfo.color}25`,
+              color: phaseInfo.color,
+            }}
+          >
+            {phase !== 'live' && (
+              <div
+                className="w-1.5 h-1.5 rounded-full animate-pulse"
+                style={{ backgroundColor: phaseInfo.color }}
+              />
+            )}
+            <span className="font-medium">
+              {statusMessage || phaseInfo.label}
+            </span>
           </div>
         )}
       </div>
 
-      {/* CENTER: View Switcher */}
+      {/* CENTER: View Switcher (indicators only — do NOT trigger execution) */}
       <div className="flex-1 flex items-center justify-center">
         <div className="flex items-center h-[28px] rounded-lg bg-[#1a1a1a] border border-[#222] overflow-hidden">
           {views.map((v) => (
@@ -94,19 +111,8 @@ export function AtomsTopBar({
         </div>
       </div>
 
-      {/* RIGHT: Actions */}
-      <div className="flex items-center gap-1.5 pr-3">
-        <button
-          onClick={onPublish}
-          className="flex items-center gap-1.5 h-[28px] px-3 rounded-lg bg-emerald-600/15 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-600/25 transition-colors text-[12px]"
-        >
-          <Play size={12} />
-          Run
-        </button>
-        <button className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-[#1e1e1e] text-gray-500 hover:text-gray-300 transition-colors" title="Share">
-          <Share2 size={14} />
-        </button>
-      </div>
+      {/* RIGHT: Empty — no Run, no Share (ATMOS mode) */}
+      <div className="w-[60px]" />
     </header>
   );
 }

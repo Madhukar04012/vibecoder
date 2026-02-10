@@ -1,6 +1,7 @@
 """
 VibeCober API - Main Application
-v0.6.0: MetaGPT-style architecture with Agents, Runs, Messages, Artifacts
+v0.6.1: MetaGPT-style architecture with Agents, Runs, Messages, Artifacts
++ Phase-2: Environment & Visualization (Terminal WS, Events)
 """
 
 from pathlib import Path
@@ -21,6 +22,11 @@ from backend.api.chat_stream import router as chat_stream_router
 from backend.api.chat_simple import router as chat_router
 from backend.api.run import router as run_router
 from backend.api.atoms_engine import router as atoms_router
+from backend.api.terminal_ws import router as terminal_router
+from backend.api.hitl import router as hitl_router
+from backend.api.marketplace import router as marketplace_router
+from backend.api.snapshot import router as snapshot_router
+from backend.api.atmos import router as atmos_router
 
 # Import all models to ensure they're registered
 from backend.models import (
@@ -37,7 +43,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="VibeCober API",
     description="AI-powered project generator with multi-agent architecture (MetaGPT-style)",
-    version="0.6.1"
+    version="0.7.0"
 )
 
 # CORS middleware - allow all origins for local dev (browser fetch from any port)
@@ -81,6 +87,21 @@ app.include_router(run_router)
 # Atoms Engine (Multi-Agent + Race Mode)
 app.include_router(atoms_router)
 
+# Phase-2: Terminal WebSocket
+app.include_router(terminal_router)
+
+# Phase-4: HITL Clarification Cards
+app.include_router(hitl_router)
+
+# Phase-6: Atoms Marketplace
+app.include_router(marketplace_router)
+
+# Phase-5: Time-Travel Snapshots
+app.include_router(snapshot_router)
+
+# ATMOS: AI-Only Autonomous Pipeline
+app.include_router(atmos_router)
+
 
 # ---------- Global exception handler ----------
 
@@ -95,7 +116,28 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api/status")
 def api_status():
-    return {"status": "VibeCober API running", "version": "0.6.1"}
+    return {"status": "VibeCober API running", "version": "0.7.0"}
+
+
+@app.get("/api/circuit-breakers")
+def circuit_breaker_status():
+    """Get status of all circuit breakers."""
+    from backend.engine.circuit_breaker import get_all_breaker_statuses
+    return {"breakers": get_all_breaker_statuses()}
+
+
+@app.get("/api/race-mode/history")
+def race_mode_history():
+    """Get race mode execution history."""
+    from backend.engine.race_mode import get_race_mode
+    return {"races": get_race_mode().get_history()}
+
+
+@app.get("/api/prompt-optimizer/stats")
+def optimizer_stats():
+    """Get prompt optimizer statistics."""
+    from backend.engine.prompt_optimizer import get_prompt_optimizer
+    return {"stats": get_prompt_optimizer().get_stats()}
 
 
 @app.get("/health")

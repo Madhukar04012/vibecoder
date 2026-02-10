@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VibeCoder Backend Launcher
+VibeCober Backend Launcher
 Starts the backend server with proper configuration
 """
 import os
@@ -10,12 +10,12 @@ import subprocess
 # Change to project root
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Python executable path
-PYTHON_EXE = "C:/Users/annam/vibecober/.venv/Scripts/python.exe"
+# Use current Python interpreter (supports venv activation)
+PYTHON_EXE = sys.executable
 
 def main():
     print("=" * 60)
-    print("🚀 Starting VibeCoder Backend Server")
+    print("🚀 Starting VibeCober Backend Server")
     print("=" * 60)
     print()
     print("Backend will run on: http://0.0.0.0:8000")

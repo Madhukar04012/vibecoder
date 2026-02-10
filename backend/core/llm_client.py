@@ -51,29 +51,31 @@ def call_ollama(prompt: str, model: str = "mistral"):
             print("[LLM] Empty response from model")
             return None
 
-        # Try to extract JSON from response - look for JSON block
-        json_match = re.search(r'\{[^{}]*"project_type"[^{}]*\}', output, re.DOTALL)
-        
-        if json_match:
-            json_str = json_match.group()
-            # Clean up common issues
-            json_str = json_str.replace("'", '"')  # Single to double quotes
-            return json.loads(json_str)
-        
-        # Fallback: try to find any JSON object
+        # Extract JSON: find outermost { } pair (handles nested JSON for planner/engineer)
         json_start = output.find("{")
-        json_end = output.rfind("}") + 1
-        
-        if json_start == -1 or json_end == 0:
+        if json_start == -1:
             print("[LLM] No JSON found in response")
             return None
-            
-        json_str = output[json_start:json_end]
-        
-        # Try to fix common JSON issues
+
+        depth = 0
+        json_end = -1
+        for i in range(json_start, len(output)):
+            if output[i] == "{":
+                depth += 1
+            elif output[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    json_end = i + 1
+                    break
+
+        json_str = output[json_start:json_end] if json_end > json_start else output[json_start:]
+        if not json_str.endswith("}"):
+            json_str = output[json_start:output.rfind("}") + 1]  # fallback to last }
+
+        # Fix common LLM JSON issues
         json_str = json_str.replace("'", '"')
-        json_str = re.sub(r',\s*}', '}', json_str)  # Remove trailing commas
-        json_str = re.sub(r',\s*]', ']', json_str)  # Remove trailing commas in arrays
+        json_str = re.sub(r',\s*}', '}', json_str)  # trailing commas in objects
+        json_str = re.sub(r',\s*]', ']', json_str)  # trailing commas in arrays
         
         return json.loads(json_str)
 

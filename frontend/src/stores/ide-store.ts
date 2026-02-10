@@ -1,16 +1,16 @@
 /**
- * IDE Store - Cursor/Replit Mode
- * Full state management for AI-powered IDE
- * Streaming support, file tracking, AI progress
+ * IDE Store - Atmos Mode
+ * Minimal state: open files, active file, editor state, project info
+ * No approvals. No intents. No diffs. No reviews.
  */
 
 import { create } from 'zustand';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-
+// ─── Workspace Mode ─────────────────────────────────────────────────────────
 export type WorkspaceMode = 'empty' | 'project';
+
+// ─── Project State (simplified) ─────────────────────────────────────────────
 export type ProjectState = 'no_project' | 'loaded' | 'ai_running';
-export type AIStreamStatus = 'idle' | 'thinking' | 'generating' | 'streaming' | 'done' | 'error';
 
 export interface ProjectInfo {
   id: string;
@@ -18,37 +18,48 @@ export interface ProjectInfo {
   path?: string;
 }
 
+// ─── Activity Log (passive, for visibility only) ────────────────────────────
 export interface AIActivityEntry {
   id: string;
   timestamp: number;
   action: string;
   detail?: string;
   success?: boolean;
-  type?: 'file_create' | 'file_modify' | 'thinking' | 'message' | 'command' | 'error';
 }
 
-export type TerminalLineType = 'command' | 'stdout' | 'stderr';
+// ─── Terminal Output (shared between chat and terminal panel) ────────────────
+export type TerminalLineType = "command" | "stdout" | "stderr";
 export interface TerminalLine {
   type: TerminalLineType;
   text: string;
+}
+
+// ─── Chat Messages (Atoms chat panel) ─────────────────────────────────────
+export type ChatFileStatus = 'pending' | 'generating' | 'done';
+
+export interface ChatFileItem {
+  path: string;
+  status: ChatFileStatus;
 }
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp: number;
   isStreaming?: boolean;
-  files?: { path: string; status: 'pending' | 'generating' | 'done' }[];
+  files?: ChatFileItem[];
 }
 
+// ─── File Status ──────────────────────────────────────────────────────────
 export interface FileStatus {
-  isNew: boolean;
-  isModified: boolean;
-  isAIGenerated: boolean;
-  isLiveWriting: boolean;
-  lastModified: number;
+  isNew?: boolean;
+  isModified?: boolean;
+  isAIGenerated?: boolean;
+  isLiveWriting?: boolean;
 }
+
+// ─── AI Status + Agent Pipeline ───────────────────────────────────────────
+export type AIStatus = 'idle' | 'thinking' | 'generating' | 'streaming' | 'done' | 'error';
 
 export interface AgentStep {
   id: string;
@@ -58,10 +69,9 @@ export interface AgentStep {
   description: string;
   status: 'running' | 'done';
   result?: string;
-  timestamp: number;
 }
 
-// ─── Store Interface ────────────────────────────────────────────────────────
+// ─── Store ──────────────────────────────────────────────────────────────────
 
 interface IDEState {
   // Editor tabs
@@ -73,19 +83,8 @@ interface IDEState {
   closeFile: (path: string) => void;
   setActiveFile: (path: string | null) => void;
   updateFileContent: (path: string, content: string) => void;
-  createFile: (path: string, content: string, aiGenerated?: boolean) => void;
-  appendToFile: (path: string, delta: string) => void;
-  setFileLiveWriting: (path: string, writing: boolean) => void;
-  deleteFile: (path: string) => void;
-  renameFile: (oldPath: string, newPath: string) => void;
 
-  // Agent pipeline steps
-  agentSteps: AgentStep[];
-  addAgentStep: (step: Omit<AgentStep, 'id' | 'timestamp' | 'status'>) => void;
-  completeAgentStep: (agent: string, result: string) => void;
-  clearAgentSteps: () => void;
-
-  // Workspace
+  // Workspace mode
   workspaceMode: WorkspaceMode;
   setWorkspaceMode: (mode: WorkspaceMode) => void;
   resetToEmptyWorkspace: () => void;
@@ -96,27 +95,12 @@ interface IDEState {
   setProject: (p: ProjectInfo | null) => void;
   setProjectState: (s: ProjectState) => void;
 
-  // AI Stream state
-  aiStatus: AIStreamStatus;
-  aiCurrentFile: string | null;
-  aiFileProgress: { current: number; total: number };
-  setAIStatus: (status: AIStreamStatus) => void;
-  setAICurrentFile: (file: string | null) => void;
-  setAIFileProgress: (current: number, total: number) => void;
-
-  // Chat messages
-  chatMessages: ChatMessage[];
-  addChatMessage: (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
-  updateLastAssistantMessage: (content: string) => void;
-  appendToLastAssistantMessage: (token: string) => void;
-  clearChat: () => void;
-
-  // Activity log
+  // Activity log (passive visibility only - never controls execution)
   activityLog: AIActivityEntry[];
-  addActivity: (action: string, detail?: string, success?: boolean, type?: AIActivityEntry['type']) => void;
+  addActivity: (action: string, detail?: string, success?: boolean) => void;
   clearActivity: () => void;
 
-  // Workspace awareness
+  // Workspace awareness (passive signals, no UI)
   recentlyOpenedFiles: string[];
   recentlyModifiedFiles: string[];
   activeContextFiles: string[];
@@ -124,10 +108,37 @@ interface IDEState {
   markModified: (path: string) => void;
   setActiveContext: (paths: string[]) => void;
 
-  // Terminal output
+  // Terminal output (shared)
   terminalLines: TerminalLine[];
   appendTerminalLine: (text: string, type?: TerminalLineType) => void;
   clearTerminal: () => void;
+
+  // Chat messages
+  chatMessages: ChatMessage[];
+  addChatMessage: (msg: Omit<ChatMessage, 'id'> & { id?: string }) => void;
+  updateLastAssistantMessage: (content: string) => void;
+  appendToLastAssistantMessage: (token: string) => void;
+  clearChat: () => void;
+
+  // AI status + file writing
+  aiStatus: AIStatus;
+  setAIStatus: (status: AIStatus) => void;
+  aiCurrentFile: string | null;
+  setAICurrentFile: (path: string | null) => void;
+  aiFileProgress: { index: number; total: number } | null;
+  setAIFileProgress: (index: number, total: number) => void;
+  fileLiveWriting: Record<string, boolean>;
+  setFileLiveWriting: (path: string, isLive: boolean) => void;
+
+  // File operations from chat
+  createFile: (path: string, content: string, openAfter?: boolean) => void;
+  appendToFile: (path: string, delta: string) => void;
+
+  // Agent pipeline steps
+  agentSteps: AgentStep[];
+  addAgentStep: (step: Omit<AgentStep, 'id' | 'status'>) => void;
+  completeAgentStep: (agent: string, result?: string) => void;
+  clearAgentSteps: () => void;
 }
 
 const makeId = () => Math.random().toString(36).slice(2, 11);
@@ -151,6 +162,7 @@ export const useIDEStore = create<IDEState>((set, get) => ({
       });
     }
     set({ activeFile: path });
+    // Workspace awareness signals
     markOpened(path);
     setActiveContext([path]);
   },
@@ -162,7 +174,9 @@ export const useIDEStore = create<IDEState>((set, get) => ({
       openFiles: next,
       activeFile:
         path === activeFile
-          ? next.length ? next[next.length - 1] : null
+          ? next.length
+            ? next[next.length - 1]
+            : null
           : activeFile,
     });
   },
@@ -175,83 +189,11 @@ export const useIDEStore = create<IDEState>((set, get) => ({
       fileStatuses: {
         ...state.fileStatuses,
         [path]: {
-          ...(state.fileStatuses[path] || { isNew: false, isAIGenerated: false }),
+          ...state.fileStatuses[path],
           isModified: true,
-          lastModified: Date.now(),
         },
       },
     })),
-
-  createFile: (path, content, aiGenerated = false) => {
-    const { openFiles } = get();
-    set((state) => ({
-      fileContents: { ...state.fileContents, [path]: content },
-      fileStatuses: {
-        ...state.fileStatuses,
-        [path]: {
-          isNew: true,
-          isModified: false,
-          isAIGenerated: aiGenerated,
-          isLiveWriting: false,
-          lastModified: Date.now(),
-        },
-      },
-      openFiles: openFiles.includes(path) ? openFiles : [...openFiles, path],
-      workspaceMode: 'project' as WorkspaceMode,
-    }));
-  },
-
-  appendToFile: (path, delta) =>
-    set((state) => ({
-      fileContents: {
-        ...state.fileContents,
-        [path]: (state.fileContents[path] ?? '') + delta,
-      },
-    })),
-
-  setFileLiveWriting: (path, writing) =>
-    set((state) => ({
-      fileStatuses: {
-        ...state.fileStatuses,
-        [path]: {
-          ...(state.fileStatuses[path] || { isNew: true, isModified: false, isAIGenerated: true, lastModified: Date.now() }),
-          isLiveWriting: writing,
-        },
-      },
-    })),
-
-  deleteFile: (path) => {
-    const { openFiles, activeFile, fileContents, fileStatuses } = get();
-    const newContents = { ...fileContents };
-    delete newContents[path];
-    const newStatuses = { ...fileStatuses };
-    delete newStatuses[path];
-    const newOpen = openFiles.filter((f) => f !== path);
-    set({
-      fileContents: newContents,
-      fileStatuses: newStatuses,
-      openFiles: newOpen,
-      activeFile: path === activeFile ? (newOpen[newOpen.length - 1] || null) : activeFile,
-    });
-  },
-
-  renameFile: (oldPath, newPath) => {
-    const { fileContents, fileStatuses, openFiles, activeFile } = get();
-    const content = fileContents[oldPath] ?? '';
-    const status = fileStatuses[oldPath];
-    const newContents = { ...fileContents };
-    delete newContents[oldPath];
-    newContents[newPath] = content;
-    const newStatuses = { ...fileStatuses };
-    delete newStatuses[oldPath];
-    if (status) newStatuses[newPath] = status;
-    set({
-      fileContents: newContents,
-      fileStatuses: newStatuses,
-      openFiles: openFiles.map((f) => (f === oldPath ? newPath : f)),
-      activeFile: activeFile === oldPath ? newPath : activeFile,
-    });
-  },
 
   // ─── Workspace ────────────────────────────────────────────────────────────
   workspaceMode: 'empty',
@@ -265,149 +207,206 @@ export const useIDEStore = create<IDEState>((set, get) => ({
       openFiles: [],
       activeFile: null,
       fileContents: {},
-      fileStatuses: {},
-      chatMessages: [],
-      agentSteps: [],
-      aiStatus: 'idle',
-      aiCurrentFile: null,
-      aiFileProgress: { current: 0, total: 0 },
     }),
 
   // ─── Project ──────────────────────────────────────────────────────────────
   projectState: 'no_project',
   project: null,
-  setProject: (p) => set({ project: p, projectState: p ? 'loaded' : 'no_project' }),
+
+  setProject: (p) =>
+    set({
+      project: p,
+      projectState: p ? 'loaded' : 'no_project',
+    }),
+
   setProjectState: (s) => set({ projectState: s }),
 
-  // ─── AI Stream State ──────────────────────────────────────────────────────
-  aiStatus: 'idle',
-  aiCurrentFile: null,
-  aiFileProgress: { current: 0, total: 0 },
-  setAIStatus: (status) => set({ aiStatus: status }),
-  setAICurrentFile: (file) => set({ aiCurrentFile: file }),
-  setAIFileProgress: (current, total) => set({ aiFileProgress: { current, total } }),
-
-  // ─── Agent Pipeline Steps ──────────────────────────────────────────────────
-  agentSteps: [],
-
-  addAgentStep: (step) =>
-    set((s) => ({
-      agentSteps: [
-        ...s.agentSteps,
-        { ...step, id: makeId(), timestamp: Date.now(), status: 'running' as const },
-      ],
-    })),
-
-  completeAgentStep: (agent, result) =>
-    set((s) => ({
-      agentSteps: s.agentSteps.map((step) =>
-        step.agent === agent && step.status === 'running'
-          ? { ...step, status: 'done' as const, result }
-          : step
-      ),
-    })),
-
-  clearAgentSteps: () => set({ agentSteps: [] }),
-
-  // ─── Chat Messages ────────────────────────────────────────────────────────
-  chatMessages: [],
-
-  addChatMessage: (msg) =>
-    set((s) => ({
-      chatMessages: [
-        ...s.chatMessages,
-        { ...msg, id: makeId(), timestamp: Date.now() },
-      ],
-    })),
-
-  updateLastAssistantMessage: (content) =>
-    set((s) => {
-      const msgs = [...s.chatMessages];
-      for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === 'assistant') {
-          msgs[i] = { ...msgs[i], content, isStreaming: false };
-          break;
-        }
-      }
-      return { chatMessages: msgs };
-    }),
-
-  appendToLastAssistantMessage: (token) =>
-    set((s) => {
-      const msgs = [...s.chatMessages];
-      for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].role === 'assistant') {
-          msgs[i] = { ...msgs[i], content: msgs[i].content + token };
-          break;
-        }
-      }
-      return { chatMessages: msgs };
-    }),
-
-  clearChat: () => set({ chatMessages: [] }),
-
-  // ─── Activity Log ─────────────────────────────────────────────────────────
+  // ─── Activity Log (passive only) ──────────────────────────────────────────
   activityLog: [],
 
-  addActivity: (action, detail, success, type) =>
+  addActivity: (action, detail, success) =>
     set((s) => ({
       activityLog: [
         ...s.activityLog,
-        { id: makeId(), timestamp: Date.now(), action, detail, success, type },
-      ].slice(-100),
+        {
+          id: makeId(),
+          timestamp: Date.now(),
+          action,
+          detail,
+          success,
+        },
+      ].slice(-50), // Keep last 50 entries
     })),
 
   clearActivity: () => set({ activityLog: [] }),
 
-  // ─── Workspace Awareness ──────────────────────────────────────────────────
+  // ─── Workspace Awareness (passive, no UI) ──────────────────────────────────
   recentlyOpenedFiles: [],
   recentlyModifiedFiles: [],
   activeContextFiles: [],
 
   markOpened: (path) =>
     set((s) => ({
-      recentlyOpenedFiles: [path, ...s.recentlyOpenedFiles.filter((p) => p !== path)].slice(0, 10),
+      recentlyOpenedFiles: [
+        path,
+        ...s.recentlyOpenedFiles.filter((p) => p !== path),
+      ].slice(0, 10),
     })),
 
   markModified: (path) =>
     set((s) => ({
-      recentlyModifiedFiles: [path, ...s.recentlyModifiedFiles.filter((p) => p !== path)].slice(0, 10),
+      recentlyModifiedFiles: [
+        path,
+        ...s.recentlyModifiedFiles.filter((p) => p !== path),
+      ].slice(0, 10),
     })),
 
   setActiveContext: (paths) =>
-    set({ activeContextFiles: Array.from(new Set(paths.filter(Boolean))).slice(0, 10) }),
+    set({
+      activeContextFiles: Array.from(new Set(paths.filter(Boolean))).slice(0, 10),
+    }),
 
-  // ─── Terminal ─────────────────────────────────────────────────────────────
+  // ─── Terminal Output (shared) ──────────────────────────────────────────────
   terminalLines: [],
 
-  appendTerminalLine: (text, type = 'stdout') =>
+  appendTerminalLine: (text, type = "stdout") =>
     set((s) => ({
       terminalLines: [...s.terminalLines, { type, text }].slice(-500),
     })),
 
   clearTerminal: () => set({ terminalLines: [] }),
+
+  // ─── Chat messages ──────────────────────────────────────────────────────
+  chatMessages: [],
+
+  addChatMessage: (msg) =>
+    set((s) => ({
+      chatMessages: [...s.chatMessages, { id: msg.id ?? makeId(), ...msg }],
+    })),
+
+  updateLastAssistantMessage: (content) =>
+    set((s) => {
+      const next = [...s.chatMessages];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === 'assistant') {
+          next[i] = { ...next[i], content };
+          break;
+        }
+      }
+      return { chatMessages: next };
+    }),
+
+  appendToLastAssistantMessage: (token) =>
+    set((s) => {
+      const next = [...s.chatMessages];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === 'assistant') {
+          next[i] = { ...next[i], content: next[i].content + token };
+          break;
+        }
+      }
+      return { chatMessages: next };
+    }),
+
+  clearChat: () => set({ chatMessages: [] }),
+
+  // ─── AI status + file writing ───────────────────────────────────────────
+  aiStatus: 'idle',
+  setAIStatus: (status) => set({ aiStatus: status }),
+  aiCurrentFile: null,
+  setAICurrentFile: (path) => set({ aiCurrentFile: path }),
+  aiFileProgress: null,
+  setAIFileProgress: (index, total) => set({ aiFileProgress: { index, total } }),
+  fileLiveWriting: {},
+  setFileLiveWriting: (path, isLive) =>
+    set((s) => ({
+      fileLiveWriting: { ...s.fileLiveWriting, [path]: isLive },
+      fileStatuses: {
+        ...s.fileStatuses,
+        [path]: {
+          ...s.fileStatuses[path],
+          isLiveWriting: isLive,
+        },
+      },
+    })),
+
+  // ─── File operations from chat ──────────────────────────────────────────
+  createFile: (path, content, openAfter = false) =>
+    set((s) => ({
+      fileContents: { ...s.fileContents, [path]: content },
+      fileStatuses: {
+        ...s.fileStatuses,
+        [path]: {
+          ...s.fileStatuses[path],
+          isNew: true,
+          isAIGenerated: true,
+          isModified: false,
+        },
+      },
+      openFiles: s.openFiles.includes(path) ? s.openFiles : [...s.openFiles, path],
+      activeFile: openAfter ? path : s.activeFile,
+    })),
+
+  appendToFile: (path, delta) =>
+    set((s) => ({
+      fileContents: { ...s.fileContents, [path]: (s.fileContents[path] ?? '') + delta },
+      fileStatuses: {
+        ...s.fileStatuses,
+        [path]: {
+          ...s.fileStatuses[path],
+          isAIGenerated: true,
+        },
+      },
+      recentlyModifiedFiles: [
+        path,
+        ...s.recentlyModifiedFiles.filter((p) => p !== path),
+      ].slice(0, 10),
+    })),
+
+  // ─── Agent pipeline ─────────────────────────────────────────────────────
+  agentSteps: [],
+
+  addAgentStep: (step) =>
+    set((s) => ({
+      agentSteps: [
+        ...s.agentSteps,
+        {
+          id: makeId(),
+          status: 'running',
+          ...step,
+        },
+      ],
+    })),
+
+  completeAgentStep: (agent, result) =>
+    set((s) => ({
+      agentSteps: s.agentSteps.map((step) =>
+        step.agent === agent
+          ? { ...step, status: 'done', result: result ?? step.result }
+          : step
+      ),
+    })),
+
+  clearAgentSteps: () => set({ agentSteps: [] }),
 }));
 
-// ─── Persistence ────────────────────────────────────────────────────────────
+// ─── PERSISTENCE (invisible, no UI coupling) ────────────────────────────────
+// Only persists: openFiles, activeFile
+// Does NOT persist: agent state, locks, activityLog, fileContents
 
-const IDE_PERSIST_KEY = 'vibecober:ide:v2';
+const IDE_PERSIST_KEY = "atmos:ide:v1";
 
 interface PersistedIDE {
   openFiles: string[];
   activeFile: string | null;
-  fileContents: Record<string, string>;
-  fileStatuses: Record<string, FileStatus>;
-  chatMessages: ChatMessage[];
 }
 
-let lastSaved = '';
+// Save on change (automatic, invisible)
+let lastSaved = "";
 useIDEStore.subscribe((state) => {
   const toSave: PersistedIDE = {
     openFiles: state.openFiles,
     activeFile: state.activeFile,
-    fileContents: state.fileContents,
-    fileStatuses: state.fileStatuses,
-    chatMessages: state.chatMessages.slice(-50),
   };
   const json = JSON.stringify(toSave);
   if (json !== lastSaved) {
@@ -415,38 +414,25 @@ useIDEStore.subscribe((state) => {
     try {
       localStorage.setItem(IDE_PERSIST_KEY, json);
     } catch {
-      // Storage full → ignore
+      // Storage full or unavailable → ignore
     }
   }
 });
 
+// Restore on boot (call once at app start)
 export function restoreIDEState(): void {
   try {
     const raw = localStorage.getItem(IDE_PERSIST_KEY);
     if (!raw) return;
+
     const saved = JSON.parse(raw) as PersistedIDE;
     if (!Array.isArray(saved.openFiles)) return;
-
-    // Clean up streaming state from messages (in case page was closed during stream)
-    const messages = (saved.chatMessages ?? []).map((m) => ({
-      ...m,
-      isStreaming: false,
-    }));
-
-    const fileContents = saved.fileContents ?? {};
-    const hasFiles = Object.keys(fileContents).length > 0;
 
     useIDEStore.setState({
       openFiles: saved.openFiles,
       activeFile: saved.activeFile ?? null,
-      fileContents,
-      fileStatuses: saved.fileStatuses ?? {},
-      chatMessages: messages,
-      workspaceMode: hasFiles ? 'project' : 'empty',
-      projectState: hasFiles ? 'loaded' : 'no_project',
-      project: hasFiles ? { id: 'restored', name: 'My Project' } : null,
     });
   } catch {
-    // Corrupted → start fresh
+    // Corrupted state → ignore, start fresh
   }
 }

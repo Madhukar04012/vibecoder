@@ -1,186 +1,133 @@
 /**
- * NovaIDE - AI-Powered IDE Layout
- * Cursor/Replit-style: Chat + File Explorer + Editor + Terminal
+ * NovaIDE - ATMOS AI-Only Layout
+ * 
+ * ATMOS Core Law: User expresses intent. AI decides everything else.
+ * 
+ * Layout: Chat (left, resizable) + Explorer + Editor (center) + Preview
+ * ALL views are ATMOS-controlled. No manual triggers.
+ * No terminal panel. No keyboard shortcuts. No manual execution.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
-import { AtomsTopBar } from '@/components/AtomsTopBar';
 import { AtomsChatPanel } from '@/components/AtomsChatPanel';
 import FilePanel from '@/components/layout/FilePanel';
 import { EditorPanel } from '@/components/editor/EditorPanel';
-import { AtomsTerminalPanel } from '@/components/AtomsTerminalPanel';
-import { AtomsAgentTimelineOverlay } from '@/components/AtomsAgentTimelineOverlay';
 import { useIDEStore, restoreIDEState } from '@/stores/ide-store';
-import { executeCommand, startPreview } from '@/lib/studio';
-import { EventBus, useEventBus } from '@/lib/event-bus';
+import { useAtmosStore } from '@/lib/atmos-state';
+import { useEventBus } from '@/lib/event-bus';
 
-type ViewMode = 'editor' | 'viewer' | 'terminal';
+type ViewMode = 'editor' | 'viewer';
 
 export default function NovaIDE() {
-  const PROJECT_ID = 'demo';
-  const { workspaceMode, project, addActivity } = useIDEStore();
-
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
-  const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isSplit, setIsSplit] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(false);
-  const [showTerminal, setShowTerminal] = useState(false);
+  const previewUrl = useAtmosStore((s) => s.previewUrl);
+  const project = useIDEStore((s) => s.project);
 
   // Restore state on boot
   useEffect(() => {
     restoreIDEState();
   }, []);
 
-  // Auto-switch to preview when AI finishes deploying
-  useEventBus('PREVIEW_READY', (event) => {
-    const url = (event.payload as { url: string }).url;
-    setPreviewUrl(url);
-    setViewMode('viewer');
-    setShowTerminal(false);
+  // ── ATMOS Auto-View Switching ──────────────────────────────────────────────
+  useEventBus('ATMOS_PHASE_CHANGE', (event) => {
+    const { phase: newPhase } = event.payload as { phase: string };
+    if (newPhase === 'live') setViewMode('viewer');
+    if (newPhase === 'generating') setViewMode('editor');
   });
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === 'b') {
-        e.preventDefault();
-        setSidebarVisible((v) => !v);
-        return;
-      }
-      if (mod && e.key === '`') {
-        e.preventDefault();
-        setShowTerminal((v) => !v);
-        return;
-      }
-      if (mod && e.key === 'Enter') {
-        e.preventDefault();
-        setViewMode((m) => (m === 'editor' ? 'viewer' : 'editor'));
-        return;
-      }
-      if (mod && e.key === '\\') {
-        e.preventDefault();
-        setIsSplit((s) => !s);
-        return;
-      }
-      if (mod && e.shiftKey && e.key.toLowerCase() === 'l') {
-        e.preventDefault();
-        setShowTimeline((v) => !v);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+  // ── ATMOS File Events → IDE Store ──────────────────────────────────────────
+  useEventBus('FILE_CREATED', (event) => {
+    const { path, content } = event.payload as { path: string; content: string };
+    const store = useIDEStore.getState();
+    store.createFile(path, content || '');
+    if (store.openFiles.length === 0) store.openFile(path);
+  });
 
-  // Preview
-  useEffect(() => {
-    if (viewMode === 'viewer' && workspaceMode === 'project') {
-      startPreview(PROJECT_ID)
-        .then((r) => setPreviewUrl(r.url))
-        .catch(() => setPreviewUrl('http://127.0.0.1:5174'));
-    } else {
-      setPreviewUrl(null);
-    }
-  }, [viewMode, workspaceMode]);
-
-  // Build command
-  const handlePublish = useCallback(async () => {
-    if (workspaceMode !== 'project') return;
-    setShowTerminal(true);
-    try {
-      const res = await executeCommand(PROJECT_ID, 'npm run build');
-      addActivity(res.success ? 'Build completed' : 'Build failed', res.output, res.success);
-    } catch (e) {
-      addActivity('Build failed', (e as Error)?.message, false);
-    }
-  }, [workspaceMode, addActivity]);
+  useEventBus('FILE_UPDATED', (event) => {
+    const { path, content } = event.payload as { path: string; content: string };
+    useIDEStore.getState().createFile(path, content || '');
+  });
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden" style={{ background: '#0a0a0a', color: '#e5e5e5' }}>
-      {/* Top Bar */}
-      <AtomsTopBar
-        view={viewMode === 'viewer' ? 'app' : viewMode === 'terminal' ? 'terminal' : 'editor'}
-        setView={(v) => {
-          if (v === 'terminal') setShowTerminal((t) => !t);
-          else setViewMode(v === 'app' ? 'viewer' : v === 'terminal' ? 'terminal' : 'editor');
-        }}
-        sidebarVisible={sidebarVisible}
-        onToggleSidebar={() => setSidebarVisible((v) => !v)}
-        onPublish={handlePublish}
-        projectName={project?.name ?? 'New Project'}
-      />
+    <div className="h-screen w-screen overflow-hidden" style={{ background: '#0a0a0a', color: '#e5e5e5' }}>
+      <div className="h-full w-full flex flex-col overflow-hidden">
+        {/* Main Content — resizable chat + editor (NO TOP BAR) */}
+        <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden relative">
+          
+          <Group orientation="horizontal" id="atmos-main-v3">
+            {/* Chat Panel — resizable with pixel-based min */}
+            <Panel id="atmos-chat" defaultSize={35} minSize={"320px"}>
+              <div className="h-full border-r border-[#1a1a1a] overflow-hidden" style={{ background: '#111111' }}>
+                <AtomsChatPanel embedded />
+              </div>
+            </Panel>
 
-      {/* Main Content */}
-      <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
-        <Group orientation="horizontal" className="flex-1">
-          {/* Chat Panel */}
-          {sidebarVisible && (
-            <>
-              <Panel defaultSize="30" minSize="20" maxSize="45">
-                <div className="h-full border-r border-[#1a1a1a]">
-                  <AtomsChatPanel embedded />
+            {/* Drag Handle */}
+            <Separator className="w-[4px] bg-transparent hover:bg-blue-500/40 active:bg-blue-500/60 transition-colors cursor-col-resize" />
+
+            {/* Editor + Preview — fills remaining space */}
+            <Panel id="atmos-editor" defaultSize={65} minSize={"200px"}>
+              <div className="h-full w-full flex flex-col min-h-0 min-w-0 overflow-hidden" style={{ background: '#0d0d0d' }}>
+                {/* Tabs: Code / Preview */}
+                <div className="shrink-0 flex items-center gap-1 px-3 py-2 border-b border-[#1a1a1a]" style={{ background: '#0a0a0a' }}>
+                  <button
+                    onClick={() => setViewMode('editor')}
+                    className={cn(
+                      'px-3 py-1.5 text-[12px] rounded-md transition-all',
+                      viewMode === 'editor'
+                        ? 'bg-[#1a1a1a] text-white font-medium'
+                        : 'text-gray-500 hover:text-gray-300 hover:bg-[#141414]'
+                    )}
+                  >
+                    <span className="opacity-60 mr-1.5">&lt;/&gt;</span> Code
+                  </button>
+                  <button
+                    onClick={() => setViewMode('viewer')}
+                    className={cn(
+                      'px-3 py-1.5 text-[12px] rounded-md transition-all',
+                      viewMode === 'viewer'
+                        ? 'bg-[#1a1a1a] text-white font-medium'
+                        : 'text-gray-500 hover:text-gray-300 hover:bg-[#141414]'
+                    )}
+                  >
+                    <span className="opacity-60 mr-1.5">◎</span> Preview
+                  </button>
                 </div>
-              </Panel>
-              <Separator className="w-[3px] hover:bg-blue-500/30 transition-colors" />
-            </>
-          )}
 
-          {/* File Explorer */}
-          {sidebarVisible && (
-            <>
-              <Panel defaultSize="15" minSize="10" maxSize="25">
-                <div className="h-full border-r border-[#1a1a1a]">
-                  <FilePanel />
-                </div>
-              </Panel>
-              <Separator className="w-[3px] hover:bg-blue-500/30 transition-colors" />
-            </>
-          )}
-
-          {/* Editor + Terminal */}
-          <Panel defaultSize="55" minSize="30">
-            <Group orientation="vertical">
-              {/* Editor / Preview */}
-              <Panel defaultSize={showTerminal ? "70" : "100"} minSize="30">
-                <div className="h-full w-full flex flex-col min-h-0 min-w-0 overflow-hidden" style={{ background: '#0d0d0d' }}>
-                  {/* Editor View */}
-                  <div className={cn('flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden', viewMode !== 'editor' && 'hidden')}>
-                    <EditorPanel isSplit={isSplit} />
+                {/* Editor View */}
+                <div className={cn('flex-1 flex min-h-0 min-w-0 overflow-hidden', viewMode !== 'editor' && 'hidden')}>
+                  <div className="flex h-full min-h-0 min-w-0 overflow-hidden w-full">
+                    <div className="w-56 min-w-[180px] max-w-[280px] border-r border-[#1a1a1a] bg-[#0b0b0b] shrink-0">
+                      <FilePanel />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <EditorPanel />
+                    </div>
                   </div>
+                </div>
 
-                  {/* Preview View */}
-                  <div className={cn('flex-1 min-h-0 min-w-0 overflow-hidden', viewMode !== 'viewer' && 'hidden')}>
+                {/* Preview View — auto-activated when ATMOS reaches LIVE */}
+                <div className={cn('flex-1 min-h-0 min-w-0 overflow-hidden', viewMode !== 'viewer' && 'hidden')}>
+                  {previewUrl ? (
                     <iframe
-                      src={previewUrl || 'about:blank'}
+                      src={previewUrl}
                       title="Preview"
                       className="h-full w-full border-0"
                       style={{ background: '#1e1e1e' }}
                     />
-                  </div>
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-gray-600 text-[13px]">
+                      Preview will appear when the app is running
+                    </div>
+                  )}
                 </div>
-              </Panel>
-
-              {/* Terminal */}
-              {showTerminal && (
-                <>
-                  <Separator className="h-[3px] hover:bg-blue-500/30 transition-colors" />
-                  <Panel defaultSize="30" minSize="15" maxSize="50">
-                    <AtomsTerminalPanel />
-                  </Panel>
-                </>
-              )}
-            </Group>
-          </Panel>
-        </Group>
+              </div>
+            </Panel>
+          </Group>
+        </div>
       </div>
-
-      {/* Agent Timeline Overlay */}
-      {showTimeline && (
-        <AtomsAgentTimelineOverlay onClose={() => setShowTimeline(false)} />
-      )}
     </div>
   );
 }

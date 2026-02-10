@@ -28,7 +28,8 @@ describe('NovaIDE', () => {
 
   it('renders the AI assistant header', () => {
     render(<NovaIDE />);
-    expect(screen.getByText('AI Assistant')).toBeInTheDocument();
+    // Mike is the team leader (AI assistant) in the chat panel
+    expect(screen.getByText('Mike')).toBeInTheDocument();
   });
 
   it('snapshot', () => {
