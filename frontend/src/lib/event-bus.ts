@@ -35,6 +35,7 @@ export type AtmosEventType =
   | 'AI_FILE_COMPLETE'
   | 'AI_MESSAGE'
   | 'AI_MESSAGE_TOKEN'
+  | 'AI_DISCUSSION'
   | 'AI_ERROR'
   | 'AI_DONE'
   // Execution
@@ -42,6 +43,8 @@ export type AtmosEventType =
   | 'RUN_OUTPUT'
   | 'RUN_COMPLETE'
   | 'RUN_ERROR'
+  // Terminal
+  | 'TERMINAL_OUTPUT'
   // Preview
   | 'PREVIEW_REFRESH'
   | 'PREVIEW_READY'

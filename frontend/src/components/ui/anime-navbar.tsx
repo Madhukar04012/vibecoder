@@ -17,8 +17,8 @@ interface NavBarProps {
 }
 
 export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBarProps) {
-  const { theme } = useTheme();
-  const isLight = theme === 'light';
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
   const [mounted, setMounted] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>(defaultActive);
@@ -161,21 +161,21 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                         animate={
                           hoveredTab
                             ? {
-                                scale: [1, 1.1, 1],
-                                rotate: [0, -5, 5, 0],
-                                transition: {
-                                  duration: 0.5,
-                                  ease: 'easeInOut',
-                                },
-                              }
+                              scale: [1, 1.1, 1],
+                              rotate: [0, -5, 5, 0],
+                              transition: {
+                                duration: 0.5,
+                                ease: 'easeInOut',
+                              },
+                            }
                             : {
-                                y: [0, -3, 0],
-                                transition: {
-                                  duration: 2,
-                                  repeat: Infinity,
-                                  ease: 'easeInOut',
-                                },
-                              }
+                              y: [0, -3, 0],
+                              transition: {
+                                duration: 2,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                              },
+                            }
                         }
                       >
                         <motion.div
@@ -183,12 +183,12 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                           animate={
                             hoveredTab
                               ? {
-                                  scaleY: [1, 0.2, 1],
-                                  transition: {
-                                    duration: 0.2,
-                                    times: [0, 0.5, 1],
-                                  },
-                                }
+                                scaleY: [1, 0.2, 1],
+                                transition: {
+                                  duration: 0.2,
+                                  times: [0, 0.5, 1],
+                                },
+                              }
                               : {}
                           }
                           style={{ left: '25%', top: '40%' }}
@@ -198,12 +198,12 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                           animate={
                             hoveredTab
                               ? {
-                                  scaleY: [1, 0.2, 1],
-                                  transition: {
-                                    duration: 0.2,
-                                    times: [0, 0.5, 1],
-                                  },
-                                }
+                                scaleY: [1, 0.2, 1],
+                                transition: {
+                                  duration: 0.2,
+                                  times: [0, 0.5, 1],
+                                },
+                              }
                               : {}
                           }
                           style={{ right: '25%', top: '40%' }}
@@ -228,13 +228,13 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                           animate={
                             hoveredTab
                               ? {
-                                  scaleY: 1.5,
-                                  y: -1,
-                                }
+                                scaleY: 1.5,
+                                y: -1,
+                              }
                               : {
-                                  scaleY: 1,
-                                  y: 0,
-                                }
+                                scaleY: 1,
+                                y: 0,
+                              }
                           }
                           style={{ left: '30%', top: '60%' }}
                         />
@@ -267,22 +267,22 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                         animate={
                           hoveredTab
                             ? {
-                                y: [0, -4, 0],
-                                transition: {
-                                  duration: 0.3,
-                                  repeat: Infinity,
-                                  repeatType: 'reverse',
-                                },
-                              }
+                              y: [0, -4, 0],
+                              transition: {
+                                duration: 0.3,
+                                repeat: Infinity,
+                                repeatType: 'reverse',
+                              },
+                            }
                             : {
-                                y: [0, 2, 0],
-                                transition: {
-                                  duration: 1,
-                                  repeat: Infinity,
-                                  ease: 'easeInOut',
-                                  delay: 0.5,
-                                },
-                              }
+                              y: [0, 2, 0],
+                              transition: {
+                                duration: 1,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                                delay: 0.5,
+                              },
+                            }
                         }
                       >
                         <div

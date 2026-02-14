@@ -7,7 +7,7 @@ from typing import List
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func as sa_func, case
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,8 @@ router = APIRouter(prefix="/logs", tags=["Execution Logs"])
 
 # Response schema
 class ExecutionLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     task_id: int
     project_id: str
@@ -31,9 +33,6 @@ class ExecutionLogResponse(BaseModel):
     files_created: int
     output_dir: str | None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 @router.get("/projects/{project_id}", response_model=List[ExecutionLogResponse])

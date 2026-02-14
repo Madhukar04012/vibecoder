@@ -1,0 +1,65 @@
+{
+  "updated_at": "2026-02-14T20:16:16.388474+00:00",
+  "agents": {
+    "planner": {
+      "runs": 24,
+      "failures": 0,
+      "total_duration_ms": 1374262.9780000001,
+      "avg_duration_ms": 57260.957,
+      "last_status": "success",
+      "failure_rate": 0.0,
+      "last_error": null,
+      "last_updated": "2026-02-14T20:14:25.260850+00:00"
+    },
+    "coder": {
+      "runs": 24,
+      "failures": 0,
+      "total_duration_ms": 724.107,
+      "avg_duration_ms": 30.171,
+      "last_status": "success",
+      "failure_rate": 0.0,
+      "last_error": null,
+      "last_updated": "2026-02-14T20:14:25.330268+00:00"
+    },
+    "db_schema": {
+      "runs": 11,
+      "failures": 0,
+      "total_duration_ms": 75.465,
+      "avg_duration_ms": 6.86,
+      "last_status": "success",
+      "failure_rate": 0.0,
+      "last_error": null,
+      "last_updated": "2026-02-14T20:14:25.344102+00:00"
+    },
+    "code_reviewer": {
+      "runs": 10,
+      "failures": 0,
+      "total_duration_ms": 1039720.6630000001,
+      "avg_duration_ms": 103972.066,
+      "last_status": "success",
+      "failure_rate": 0.0,
+      "last_error": null,
+      "last_updated": "2026-02-14T20:16:16.381897+00:00"
+    },
+    "tester": {
+      "runs": 3,
+      "failures": 0,
+      "total_duration_ms": 12.89,
+      "avg_duration_ms": 4.297,
+      "last_status": "success",
+      "failure_rate": 0.0,
+      "last_error": null,
+      "last_updated": "2026-02-14T20:13:15.597337+00:00"
+    },
+    "auth": {
+      "runs": 4,
+      "failures": 0,
+      "total_duration_ms": 16.127,
+      "avg_duration_ms": 4.032,
+      "last_status": "success",
+      "failure_rate": 0.0,
+      "last_error": null,
+      "last_updated": "2026-02-14T20:16:16.388466+00:00"
+    }
+  }
+}

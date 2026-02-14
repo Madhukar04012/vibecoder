@@ -35,8 +35,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
             justifyContent: "center",
             padding: 24,
             fontFamily: "system-ui, sans-serif",
-            background: "#1a1a1a",
-            color: "#e5e5e5",
+            background: "var(--ide-bg, #1a1a1a)",
+            color: "var(--ide-text, #e5e5e5)",
             minHeight: "100vh",
           }}
         >
@@ -44,7 +44,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           <pre
             style={{
               padding: 16,
-              background: "#2a2a2a",
+              background: "var(--ide-settings-sidebar, #2a2a2a)",
               borderRadius: 8,
               overflow: "auto",
               maxWidth: "100%",

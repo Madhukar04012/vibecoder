@@ -1,13 +1,17 @@
 /**
  * EditorCanvas - Monaco Editor (READ-ONLY)
  * ATMOS mode: AI writes code, user reads it
- * Characters appear one by one as the AI types them — Cursor-style
+ *
+ * Uses `value` prop for reliable content syncing (controlled mode).
+ * Language switching is imperative to avoid full remounts.
+ * Auto-scrolls to bottom during live writing for Cursor-style effect.
  */
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useIDEStore } from "@/stores/ide-store";
 import { Loader2, Sparkles } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface EditorCanvasProps {
   file?: string | null;
@@ -39,101 +43,139 @@ export function EditorCanvas({ file }: EditorCanvasProps) {
   const activeFile = file ?? storeActiveFile;
   const aiCurrentFile = useIDEStore((s) => s.aiCurrentFile);
   const aiStatus = useIDEStore((s) => s.aiStatus);
-  const fileLiveWriting = useIDEStore((s) => s.fileLiveWriting);
+  const { resolvedTheme } = useTheme();
 
+  // Subscribe to file content reactively — selector uses activeFile from render
   const content = useIDEStore((s) =>
     activeFile ? s.fileContents[activeFile] ?? "" : ""
   );
 
-  const editorRef = useRef<any>(null);
-  const prevContentLenRef = useRef<number>(0);
+  // Subscribe only to the active file's live-writing status, not the whole object
+  const isLiveWriting = useIDEStore((s) =>
+    activeFile ? Boolean(s.fileLiveWriting[activeFile]) : false
+  );
 
-  const isLiveWriting = activeFile ? Boolean(fileLiveWriting?.[activeFile]) : false;
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+  const currentFileRef = useRef<string | null>(null);
   const isAIFile = aiStatus === 'generating' && aiCurrentFile === activeFile;
 
-  // ── Auto-scroll to bottom as content grows (live writing effect) ──
+  // ── Switch language when active file changes (imperative, no remount) ──
   useEffect(() => {
-    if (!editorRef.current || !isLiveWriting) return;
     const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco || !activeFile) return;
+
+    if (currentFileRef.current !== activeFile) {
+      const model = editor.getModel();
+      if (model) {
+        const lang = getLanguage(activeFile);
+        monaco.editor.setModelLanguage(model, lang);
+      }
+      currentFileRef.current = activeFile;
+    }
+  }, [activeFile]);
+
+  // ── Auto-scroll to bottom during live writing ──
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !isLiveWriting) return;
+
     const model = editor.getModel();
     if (!model) return;
 
-    const newLen = content.length;
-    if (newLen > prevContentLenRef.current) {
-      const lastLine = model.getLineCount();
-      editor.revealLine(lastLine, 1);
-      const lastCol = model.getLineMaxColumn(lastLine);
-      editor.setPosition({ lineNumber: lastLine, column: lastCol });
-    }
-    prevContentLenRef.current = newLen;
+    const lastLine = model.getLineCount();
+    editor.revealLine(lastLine, 1);
+    const lastCol = model.getLineMaxColumn(lastLine);
+    editor.setPosition({ lineNumber: lastLine, column: lastCol });
   }, [content, isLiveWriting]);
 
-  const handleMount: OnMount = (editor) => {
+  // ── Change theme without remount ──
+  useEffect(() => {
+    if (monacoRef.current) {
+      monacoRef.current.editor.setTheme(resolvedTheme === 'dark' ? 'vs-dark' : 'vs');
+    }
+  }, [resolvedTheme]);
+
+  const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
-    prevContentLenRef.current = content.length;
-  };
+    monacoRef.current = monaco;
+    currentFileRef.current = null;
+  }, []);
 
   if (!activeFile) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4" style={{ background: '#0d0d0d' }}>
-        <div className="flex flex-col items-center gap-3 opacity-40">
-          <Sparkles size={32} className="text-blue-500/60" />
-          <span className="text-[14px] text-gray-600">AI will write code here</span>
+      <div className="flex-1 flex flex-col items-center justify-center gap-6" style={{ background: 'var(--ide-bg-deep)' }}>
+        <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center border border-blue-500/20">
+          <Sparkles size={40} className="text-blue-400/60" />
+        </div>
+        <div className="text-center">
+          <p className="text-[16px] font-medium mb-2" style={{ color: 'var(--ide-text)' }}>AI will write code here</p>
+          <p className="text-[13px]" style={{ color: 'var(--ide-text-muted)' }}>Select a file or start a conversation to begin</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
+    <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative" style={{ position: 'relative', height: '100%', width: '100%' }}>
       {/* Live writing overlay */}
       {(isLiveWriting || isAIFile) && (
-        <div className="absolute top-2 right-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/25 text-[11px] text-blue-200 backdrop-blur-sm">
-          <Sparkles size={11} className="text-blue-400 animate-pulse" />
-          <span className="font-medium">AI is writing code...</span>
-          <span className="w-1.5 h-3 bg-blue-400 animate-pulse rounded-sm" />
+        <div className="absolute top-3 right-4 z-10 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600/25 to-purple-600/25 border border-blue-500/30 backdrop-blur-md shadow-lg shadow-blue-500/10">
+          <div className="flex items-center gap-2">
+            <Sparkles size={14} className="text-blue-400 animate-pulse" />
+            <span className="text-[13px] font-medium text-blue-200">AI is writing code</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-1 h-1 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1 h-1 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1 h-1 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
         </div>
       )}
 
-      <Editor
-        key={activeFile}
-        height="100%"
-        theme="vs-dark"
-        language={getLanguage(activeFile)}
-        value={content}
-        onMount={handleMount}
-        options={{
-          fontSize: 13,
-          fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace",
-          fontLigatures: true,
-          lineHeight: 20,
-          minimap: { enabled: false },
-          scrollBeyondLastLine: false,
-          padding: { top: 12, bottom: 12 },
-          renderLineHighlight: 'line',
-          cursorBlinking: 'smooth',
-          cursorSmoothCaretAnimation: 'on',
-          smoothScrolling: true,
-          bracketPairColorization: { enabled: true },
-          guides: { bracketPairs: true, indentation: true },
-          wordWrap: 'on',
-          readOnly: true,  // ATMOS: Always read-only
-          tabSize: 2,
-          suggest: { showWords: false },
-          overviewRulerBorder: false,
-          scrollbar: {
-            verticalScrollbarSize: 8,
-            horizontalScrollbarSize: 8,
-            verticalSliderSize: 8,
-          },
-        }}
-        loading={
-          <div className="flex items-center justify-center h-full gap-2 text-gray-500 text-[13px]">
-            <Loader2 size={14} className="animate-spin" />
-            Loading editor...
-          </div>
-        }
-      />
+      {/* Absolute-positioned wrapper ensures Monaco always has computed dimensions */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+        <Editor
+          height="100%"
+          width="100%"
+          theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
+          language={activeFile ? getLanguage(activeFile) : 'plaintext'}
+          value={content}
+          onMount={handleMount}
+          options={{
+            fontSize: 13,
+            fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, monospace",
+            fontLigatures: true,
+            lineHeight: 20,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            padding: { top: 12, bottom: 12 },
+            renderLineHighlight: 'line',
+            cursorBlinking: 'smooth',
+            cursorSmoothCaretAnimation: 'on',
+            smoothScrolling: true,
+            bracketPairColorization: { enabled: true },
+            guides: { bracketPairs: true, indentation: true },
+            wordWrap: 'on',
+            readOnly: true,
+            tabSize: 2,
+            suggest: { showWords: false },
+            overviewRulerBorder: false,
+            scrollbar: {
+              verticalScrollbarSize: 8,
+              horizontalScrollbarSize: 8,
+              verticalSliderSize: 8,
+            },
+          }}
+          loading={
+            <div className="flex items-center justify-center h-full gap-2 text-[13px]" style={{ color: 'var(--ide-text-muted)' }}>
+              <Loader2 size={14} className="animate-spin" />
+              Loading editor...
+            </div>
+          }
+        />
+      </div>
     </div>
   );
 }

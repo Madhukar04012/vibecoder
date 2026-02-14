@@ -20,19 +20,62 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from backend.core.tech_detector import detect_stack, get_architect_prompt_for_stack, get_engineer_prompt_for_stack, get_fallback_architecture
+
 router = APIRouter(prefix="/api/atoms", tags=["atoms"])
 
 # ─── Project Sandbox ─────────────────────────────────────────────────────────
 PROJECT_DIR = Path(__file__).resolve().parent.parent.parent / "generated_projects" / "demo"
 
 
+def _safe_file_path(relative_path: str) -> Path:
+    """Resolve path under PROJECT_DIR; reject traversal and absolute paths."""
+    if not relative_path or ".." in relative_path or relative_path.startswith("/"):
+        raise ValueError(f"Invalid file path: {relative_path!r}")
+    resolved = (PROJECT_DIR / relative_path).resolve()
+    try:
+        resolved.relative_to(PROJECT_DIR)
+    except ValueError:
+        raise ValueError(f"Invalid file path: {relative_path!r}")
+    return resolved
+
+
+def _find_frontend_dir(files_map: Dict[str, str]) -> Optional[Path]:
+    """Find the frontend directory containing package.json with vite.
+
+    The coder agent wraps output in a project folder (e.g. ``my_project/``),
+    and the frontend lives under ``<project>/frontend/``.  This helper locates
+    the correct directory on disk so that ``npm install`` and
+    ``npx vite`` run in the right place.
+    """
+    candidates: list[tuple[str, str]] = []
+    for key, content in files_map.items():
+        if key.endswith("package.json") or key.split("/")[-1] == "package.json":
+            candidates.append((key, content))
+
+    # Prefer the package.json that contains "vite" (the frontend one)
+    for key, content in candidates:
+        if "vite" in content:
+            rel_dir = "/".join(key.replace("\\", "/").split("/")[:-1])
+            return (PROJECT_DIR / rel_dir).resolve() if rel_dir else PROJECT_DIR
+
+    # Fallback: any package.json
+    if candidates:
+        key = candidates[0][0]
+        rel_dir = "/".join(key.replace("\\", "/").split("/")[:-1])
+        return (PROJECT_DIR / rel_dir).resolve() if rel_dir else PROJECT_DIR
+
+    return None
+
+
 def _write_files_to_disk(files: Dict[str, str]) -> None:
     """Write all generated files to the sandbox directory for preview."""
+    import shutil
+
     # Clean previous project
     if PROJECT_DIR.exists():
-        import shutil
         for item in PROJECT_DIR.iterdir():
-            if item.name == 'node_modules':
+            if item.name == "node_modules":
                 continue  # Don't delete node_modules (expensive to reinstall)
             if item.is_dir():
                 shutil.rmtree(item)
@@ -41,18 +84,19 @@ def _write_files_to_disk(files: Dict[str, str]) -> None:
 
     PROJECT_DIR.mkdir(parents=True, exist_ok=True)
     for path, content in files.items():
-        file_path = PROJECT_DIR / path
+        file_path = _safe_file_path(path)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(content, encoding="utf-8")
 
 
-def _run_npm_install() -> tuple[bool, str]:
-    """Run npm install in the project directory."""
+def _run_npm_install(cwd: Optional[Path] = None) -> tuple[bool, str]:
+    """Run npm install in the given directory (defaults to PROJECT_DIR). Returns (success, combined_output)."""
+    target = str(cwd or PROJECT_DIR)
     try:
         result = subprocess.run(
             "npm install",
             shell=True,
-            cwd=str(PROJECT_DIR),
+            cwd=target,
             capture_output=True,
             timeout=120,
             encoding="utf-8",
@@ -66,15 +110,68 @@ def _run_npm_install() -> tuple[bool, str]:
         return False, str(e)
 
 
+async def _run_npm_install_streaming(
+    cwd: Optional[Path],
+) -> AsyncGenerator[tuple[str, bool] | int, None]:
+    """
+    Run npm install and yield (line, is_stderr) for each line of output; finally yield return_code (int).
+    Reads stdout and stderr concurrently to avoid deadlock.
+    """
+    target = str(cwd or PROJECT_DIR)
+    proc = await asyncio.create_subprocess_shell(
+        "npm install",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=target,
+    )
+    queue: asyncio.Queue[tuple[str, bool] | None] = asyncio.Queue()
+
+    async def read_stdout() -> None:
+        if proc.stdout:
+            while True:
+                line = await proc.stdout.readline()
+                if not line:
+                    break
+                text = line.decode("utf-8", errors="replace").rstrip()
+                if text:
+                    await queue.put((text, False))
+        await queue.put(None)
+
+    async def read_stderr() -> None:
+        if proc.stderr:
+            while True:
+                line = await proc.stderr.readline()
+                if not line:
+                    break
+                text = line.decode("utf-8", errors="replace").rstrip()
+                if text:
+                    await queue.put((text, True))
+        await queue.put(None)
+
+    readers = asyncio.create_task(asyncio.gather(read_stdout(), read_stderr()))
+    sentinels = 0
+    while sentinels < 2:
+        item = await queue.get()
+        if item is None:
+            sentinels += 1
+            continue
+        yield item
+    await readers
+    await proc.wait()
+    yield proc.returncode if proc.returncode is not None else 0
+
+
 # Preview process management
 _preview_proc: Optional[subprocess.Popen] = None
 _preview_port: int = 5174
 
 
-def _start_dev_server() -> tuple[bool, str, int]:
+def _start_dev_server(cwd: Optional[Path] = None) -> tuple[bool, str, int]:
     """Start the Vite dev server for preview."""
     global _preview_proc, _preview_port
     import socket
+
+    target = cwd or PROJECT_DIR
 
     # Kill existing
     if _preview_proc is not None:
@@ -98,22 +195,31 @@ def _start_dev_server() -> tuple[bool, str, int]:
         except OSError:
             continue
 
-    pkg_json = PROJECT_DIR / "package.json"
+    pkg_json = target / "package.json"
     if not pkg_json.exists():
-        return False, "No package.json found", _preview_port
+        return False, f"No package.json found at {target}", _preview_port
 
     try:
         _preview_proc = subprocess.Popen(
             f"npx vite --port {_preview_port} --host",
             shell=True,
-            cwd=str(PROJECT_DIR),
+            cwd=str(target),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        time.sleep(1.5)  # Give dev server time to start
-        if _preview_proc.poll() is not None:
-            return False, f"Dev server exited with code {_preview_proc.returncode}", _preview_port
-        return True, f"Dev server running on port {_preview_port}", _preview_port
+        # Wait until port is accepting connections (up to 15s) so preview_ready is sent when iframe can load
+        for _ in range(30):
+            time.sleep(0.5)
+            if _preview_proc.poll() is not None:
+                return False, f"Dev server exited with code {_preview_proc.returncode}", _preview_port
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(0.5)
+                    s.connect(("127.0.0.1", _preview_port))
+                return True, f"Dev server running on port {_preview_port}", _preview_port
+            except (OSError, socket.error):
+                continue
+        return False, "Dev server failed to bind within 15s", _preview_port
     except Exception as e:
         return False, str(e), _preview_port
 
@@ -154,39 +260,91 @@ class Blackboard:
 
 # ─── LLM Caller ─────────────────────────────────────────────────────────────
 
-def _call_llm(system: str, user: str, max_tokens: int = 2048, temp: float = 0.3) -> str | None:
-    """Call NIM or Ollama. Returns raw text."""
-    import requests
+def _call_llm_sync(system: str, user: str, max_tokens: int = 2048, temp: float = 0.3, use_coder: bool = False) -> str | None:
+    """Synchronous LLM call via the gateway for cost tracking. Returns raw text.
+    
+    WARNING: This blocks the calling thread. Use _call_llm() (async) in async contexts.
+    """
+    from backend.engine.llm_gateway import llm_call
 
-    # Try NIM first
-    api_key = os.getenv("NIM_API_KEY", "").strip()
-    if api_key:
-        model = os.getenv("NIM_MODEL", "meta/llama-3.3-70b-instruct")
+    agent_name = "atoms_engineer" if use_coder else "atoms_pipeline"
+    
+    return llm_call(
+        agent_name=agent_name,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        max_tokens=max_tokens,
+        temperature=temp,
+        use_coder=use_coder,
+    )
+
+
+async def _call_llm(system: str, user: str, max_tokens: int = 2048, temp: float = 0.3, use_coder: bool = False) -> str | None:
+    """Async LLM call — runs the blocking LLM call in a thread pool so it
+    does NOT freeze the event loop."""
+    return await asyncio.to_thread(_call_llm_sync, system, user, max_tokens, temp, use_coder)
+
+
+def _stream_llm_sync(system: str, user: str, max_tokens: int = 2048, temp: float = 0.3, use_coder: bool = False):
+    """Synchronous streaming LLM call. Yields token strings.
+    
+    WARNING: This blocks. Use _stream_llm_collect() for async contexts.
+    """
+    from backend.engine.llm_gateway import llm_call_stream
+
+    agent_name = "atoms_engineer" if use_coder else "atoms_pipeline"
+    
+    yield from llm_call_stream(
+        agent_name=agent_name,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        max_tokens=max_tokens,
+        temperature=temp,
+        use_coder=use_coder,
+    )
+
+
+async def _stream_llm_to_sse(system: str, user: str, file_path: str, max_tokens: int = 2048, temp: float = 0.3, use_coder: bool = False):
+    """Async generator: run the synchronous streaming LLM in a thread and yield
+    (token, sse_event) pairs without blocking the event loop.
+    
+    Collects all tokens from the sync generator in a background thread,
+    pushes them into an asyncio.Queue, and yields SSE events from the queue.
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+    sentinel = object()  # signals "done"
+
+    def _produce():
         try:
-            r = requests.post(
-                "https://integrate.api.nvidia.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": model, "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ], "max_tokens": max_tokens, "temperature": temp},
-                timeout=90,
-            )
-            r.raise_for_status()
-            content = r.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-            return content.strip() if content.strip() else None
-        except Exception as e:
-            print(f"[LLM] NIM error: {e}")
+            for token in _stream_llm_sync(system, user, max_tokens, temp, use_coder):
+                if token:
+                    queue.put_nowait(token)
+        except Exception as exc:
+            queue.put_nowait(exc)
+        finally:
+            queue.put_nowait(sentinel)
 
-    # Fallback to Ollama
-    model = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2")
-    try:
-        r = requests.post("http://localhost:11434/api/generate",
-                          json={"model": model, "prompt": f"{system}\n\n{user}", "stream": False}, timeout=90)
-        r.raise_for_status()
-        return r.json().get("response", "").strip() or None
-    except Exception:
-        return None
+    # Start producer in a thread
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, _produce)
+
+    content_parts = []
+    while True:
+        item = await queue.get()
+        if item is sentinel:
+            break
+        if isinstance(item, Exception):
+            print(f"[Atoms Engine] Stream error: {item}")
+            break
+        content_parts.append(item)
+        yield item  # caller wraps in sse("file_delta", ...)
+
+    # Return the full content via a special attribute on the generator
+    # (callers collect from content_parts via the yielded tokens)
 
 
 def _extract_json(text: str) -> dict | list | None:
@@ -211,6 +369,10 @@ def _extract_json(text: str) -> dict | list | None:
 
 AGENT_PM_SYSTEM = """You are a Product Manager agent. Your job is to create a Product Requirements Document (PRD).
 
+IMPORTANT: The tech_hints field MUST reflect exactly what technologies 
+the user mentions in their prompt. Do NOT default to React/FastAPI if the
+user asked for different technologies (e.g., Django, Vue, Go, Angular, etc.)
+
 Output ONLY valid JSON:
 {
   "title": "Product title",
@@ -218,69 +380,65 @@ Output ONLY valid JSON:
   "user_stories": ["As a user, I want...", ...],
   "features": ["Feature 1", "Feature 2", ...],
   "constraints": ["Must be responsive", ...],
-  "tech_hints": ["Use React", "REST API", ...]
+  "tech_hints": ["<exact technologies from user prompt>"]
 }
 
 No markdown. No explanation. JSON only."""
 
-AGENT_ARCHITECT_SYSTEM = """You are a Senior Software Architect agent. Based on the PRD, design a COMPANY-LEVEL production system.
+# NOTE: AGENT_ARCHITECT_SYSTEM is now generated dynamically per-prompt via
+# get_architect_prompt_for_stack(). This static version is kept ONLY as a
+# fallback when tech detection returns nothing.
+AGENT_ARCHITECT_SYSTEM_DEFAULT = """You are a Senior Software Architect agent. Based on the PRD, design a COMPANY-LEVEL production system.
+
+IMPORTANT: Analyze the PRD carefully to determine the CORRECT technology stack.
+- If the user asks for Python/Django/Flask/FastAPI → generate Python files (.py)
+- If the user asks for Node/Express/NestJS → generate JS/TS files
+- If the user asks for Go/Gin → generate Go files (.go)
+- If the user asks for Java/Spring → generate Java files (.java)
+- If the user asks for Vue/Angular/Svelte → use those frameworks, NOT React
+- If no specific tech is mentioned, choose the BEST tech for the described project
 
 You MUST output a comprehensive project with MANY files. Think like a real engineering team.
 
 Output ONLY valid JSON:
 {
-  "stack": {"frontend": "React + Vite", "styling": "CSS Modules", "state": "React Hooks"},
+  "stack": {"backend": "<framework>", "frontend": "<framework if needed>", "database": "<if needed>"},
   "directory_structure": [
-    "package.json",
-    "vite.config.js",
-    "index.html",
-    "src/main.jsx",
-    "src/App.jsx",
-    "src/App.css",
-    "src/components/Header.jsx",
-    "src/components/Header.css",
-    "src/components/Footer.jsx",
-    "src/components/Sidebar.jsx",
-    "src/components/Layout.jsx",
-    "src/pages/Home.jsx",
-    "src/pages/About.jsx",
-    "src/hooks/useLocalStorage.js",
-    "src/utils/helpers.js",
-    "src/styles/variables.css",
-    "src/styles/global.css"
+    "<config_file>",
+    "<entry_point>",
+    "<routes/controllers>",
+    "<models>",
+    "<services>",
+    "<tests>",
+    "... at least 10-20 files"
   ],
-  "component_tree": {"App": ["Layout"], "Layout": ["Header", "Sidebar", "MainContent", "Footer"]},
+  "component_tree": {},
   "data_model": {"entities": []},
   "api_endpoints": []
 }
 
 RULES:
-- Include AT LEAST 12-20 files for a proper project
-- Include components/, pages/, hooks/, utils/, styles/ directories
-- Include proper CSS files for each component
-- Include Header, Footer, Sidebar, Layout components
-- Include utility functions and custom hooks
-- The project MUST be a complete, runnable React+Vite app
-- package.json MUST include react, react-dom, and vite dependencies
-- vite.config.js MUST use @vitejs/plugin-react
+- Include AT LEAST 10-20 files for a proper project
+- Use CORRECT file extensions for the chosen technology
+- Include proper configuration files for the stack
+- Include a test directory
+- The project MUST be complete and runnable
+- No markdown. No explanation. JSON only."""
 
-No markdown. No explanation. JSON only."""
-
-AGENT_ENGINEER_SYSTEM = """You are a Senior Software Engineer at a top tech company. Write the COMPLETE contents of the file '{file_path}'.
+# NOTE: AGENT_ENGINEER_SYSTEM is now generated dynamically per-file via
+# get_engineer_prompt_for_stack(). This static version is the fallback.
+AGENT_ENGINEER_SYSTEM_DEFAULT = """You are a Senior Software Engineer at a top tech company. Write the COMPLETE contents of the file '{file_path}'.
 
 CRITICAL RULES:
 - Write PRODUCTION-READY, COMPANY-LEVEL code
 - NO markdown, NO explanations, NO code fences (```)
 - Output ONLY the raw file content — nothing before or after
+- Detect the language from the file extension and write idiomatic code for that language
 - Include ALL imports, exports, types, and logic
 - Write REAL functionality, not placeholders or TODOs
-- Use modern best practices (hooks, functional components, proper CSS)
-- For CSS files: write comprehensive styles with variables, responsive design, hover effects
-- For components: include proper props, state management, event handlers
-- For utils: include real utility functions with error handling
-- For package.json: include react, react-dom, @vitejs/plugin-react, vite as dependencies
-- For vite.config.js: use @vitejs/plugin-react plugin
-- Make it look professional — good spacing, colors, typography"""
+- Use modern best practices for the detected language/framework
+- Include proper error handling
+- Make it look professional and well-structured"""
 
 AGENT_JUDGE_SYSTEM = """You are a Code Judge. Evaluate this code solution and score it.
 
@@ -348,8 +506,8 @@ NO markdown, NO explanations, NO code fences."""
 
 # ─── Typing Speed ────────────────────────────────────────────────────────────
 
-TYPING_CHUNK = 8
-TYPING_DELAY = 0.008
+TYPING_CHUNK = 32
+TYPING_DELAY = 0.003
 
 
 # ─── Event Helper ────────────────────────────────────────────────────────────
@@ -376,18 +534,31 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
     yield sse("agent_start", {"agent": "team_lead", "name": "Team Leader", "icon": "crown", "description": "Analyzing request and assembling the team..."})
     await asyncio.sleep(0.3)
 
-    p = prompt.lower()
-    if any(w in p for w in ["python", "fastapi", "flask", "django"]):
-        project_type = "python_api"
-    elif any(w in p for w in ["full stack", "fullstack"]):
-        project_type = "fullstack"
-    elif any(w in p for w in ["next.js", "nextjs"]):
-        project_type = "nextjs"
-    else:
-        project_type = "react"
+    # Detect technology stack from the user's prompt
+    detected_stack = detect_stack(prompt)
 
-    yield sse("agent_end", {"agent": "team_lead", "result": f"Project: {project_type}. Assigning to PM."})
+    # Derive project_type from detection
+    if detected_stack.project_type == "api" or detected_stack.is_backend_only:
+        project_type = f"{detected_stack.backend_language or 'python'}_api"
+    elif detected_stack.project_type == "fullstack":
+        project_type = "fullstack"
+    elif detected_stack.project_type == "cli":
+        project_type = f"{detected_stack.primary_language}_cli"
+    elif detected_stack.is_frontend_only:
+        project_type = detected_stack.frontend_framework.lower().replace(".", "") if detected_stack.frontend_framework else "react"
+    elif detected_stack.backend_framework and detected_stack.frontend_framework:
+        project_type = "fullstack"
+    elif detected_stack.backend_framework:
+        project_type = f"{detected_stack.backend_language or 'python'}_api"
+    elif detected_stack.frontend_framework:
+        project_type = detected_stack.frontend_framework.lower().replace(".", "").replace(" ", "")
+    else:
+        project_type = "react"  # ultimate fallback
+
+    stack_summary = detected_stack.summary()
+    yield sse("agent_end", {"agent": "team_lead", "name": "Team Leader", "icon": "crown", "result": f"Project: {project_type}. Stack: {stack_summary}. Assigning to PM."})
     yield sse("blackboard_update", {"field": "project_type", "value": project_type})
+    yield sse("blackboard_update", {"field": "detected_stack", "value": detected_stack.to_dict()})
 
     # Team Lead speaks to the team
     yield sse("discussion", {
@@ -401,7 +572,7 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
     # ═══════════════════════════════════════════════════════════════
     yield sse("agent_start", {"agent": "pm", "name": "Product Manager", "icon": "clipboard", "description": "Writing product requirements..."})
 
-    prd_raw = _call_llm(AGENT_PM_SYSTEM, f"Create a PRD for: {prompt}")
+    prd_raw = await _call_llm(AGENT_PM_SYSTEM, f"Create a PRD for: {prompt}")
     prd = _extract_json(prd_raw)
     if not prd or not isinstance(prd, dict):
         prd = {"title": prompt[:50], "description": prompt,
@@ -410,7 +581,7 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
                "constraints": ["Must work in modern browsers"], "tech_hints": [project_type]}
     board.prd = prd
 
-    yield sse("agent_end", {"agent": "pm", "result": f"PRD: {prd.get('title', 'Project')} — {len(prd.get('features', []))} features"})
+    yield sse("agent_end", {"agent": "pm", "name": "Product Manager", "icon": "clipboard", "result": f"PRD: {prd.get('title', 'Project')} — {len(prd.get('features', []))} features"})
     yield sse("blackboard_update", {"field": "prd", "value": prd})
 
     # PM presents PRD to the team
@@ -424,7 +595,7 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
     # ═══════════════════════════════════════════════════════════════
     #  DISCUSSION: Team Lead reviews the PRD
     # ═══════════════════════════════════════════════════════════════
-    tl_review = _call_llm(AGENT_TEAMLEAD_REVIEW, f"PRD:\n{json.dumps(prd, indent=2)}\n\nReview this PRD briefly.", max_tokens=200, temp=0.5)
+    tl_review = await _call_llm(AGENT_TEAMLEAD_REVIEW, f"PRD:\n{json.dumps(prd, indent=2)}\n\nReview this PRD briefly.", max_tokens=200, temp=0.5)
     if tl_review:
         tl_review = tl_review[:300]
     else:
@@ -437,7 +608,7 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
     await asyncio.sleep(0.1)
 
     # Architect chimes in
-    arch_feedback = _call_llm(AGENT_ARCHITECT_REVIEW, f"PRD:\n{json.dumps(prd, indent=2)}\n\nGive brief technical feedback.", max_tokens=200, temp=0.5)
+    arch_feedback = await _call_llm(AGENT_ARCHITECT_REVIEW, f"PRD:\n{json.dumps(prd, indent=2)}\n\nGive brief technical feedback.", max_tokens=200, temp=0.5)
     if arch_feedback:
         arch_feedback = arch_feedback[:300]
     else:
@@ -456,25 +627,20 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
     # ═══════════════════════════════════════════════════════════════
     yield sse("agent_start", {"agent": "architect", "name": "Architect", "icon": "layers", "description": "Designing system architecture..."})
 
-    arch_prompt = f"PRD:\n{json.dumps(prd, indent=2)}\n\nDesign the system architecture for a {project_type} project."
-    arch_raw = _call_llm(AGENT_ARCHITECT_SYSTEM, arch_prompt)
+    # Use tech-aware architect prompt
+    architect_system = get_architect_prompt_for_stack(detected_stack) if (detected_stack.backend_framework or detected_stack.frontend_framework or detected_stack.languages) else AGENT_ARCHITECT_SYSTEM_DEFAULT
+    arch_prompt = f"PRD:\n{json.dumps(prd, indent=2)}\n\nDesign the system architecture for a {project_type} project.\nUser request: {prompt}"
+    arch_raw = await _call_llm(architect_system, arch_prompt)
     arch = _extract_json(arch_raw)
 
     if not arch or not isinstance(arch, dict) or "directory_structure" not in arch:
-        if project_type == "react":
-            arch = {"stack": {"frontend": "React + Vite", "styling": "CSS"},
-                    "directory_structure": ["package.json", "vite.config.js", "index.html", "src/main.jsx", "src/App.jsx", "src/index.css"]}
-        elif project_type == "python_api":
-            arch = {"stack": {"backend": "FastAPI", "database": "SQLite"},
-                    "directory_structure": ["main.py", "routes.py", "models.py", "requirements.txt"]}
-        else:
-            arch = {"stack": {"frontend": "React", "backend": "FastAPI"},
-                    "directory_structure": ["package.json", "vite.config.js", "index.html", "src/main.jsx", "src/App.jsx", "src/index.css"]}
+        # Use detected-stack-aware fallback instead of hardcoded React
+        arch = get_fallback_architecture(detected_stack, prompt)
 
     board.architecture = arch
     board.file_plan = arch.get("directory_structure", [])
 
-    yield sse("agent_end", {"agent": "architect", "result": f"Architecture: {len(board.file_plan)} files planned"})
+    yield sse("agent_end", {"agent": "architect", "name": "Architect", "icon": "layers", "result": f"Architecture: {len(board.file_plan)} files planned"})
     yield sse("blackboard_update", {"field": "architecture", "value": arch})
 
     # Architect explains design to the team
@@ -502,27 +668,32 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
         yield sse("file_start", {"path": file_path, "index": idx, "total": total})
         await asyncio.sleep(0.05)
 
-        eng_system = AGENT_ENGINEER_SYSTEM.replace("{file_path}", file_path)
+        # Use tech-aware engineer prompt per-file — stream tokens live to IDE
+        eng_system = get_engineer_prompt_for_stack(detected_stack, file_path)
         eng_context = f"PRD: {json.dumps(prd)}\nArchitecture: {json.dumps(arch)}\n\nWrite the complete file: {file_path}\nUser request: {prompt}"
-        content = _call_llm(eng_system, eng_context)
 
+        # Stream tokens directly from LLM → SSE → frontend (true live coding)
+        # Uses async wrapper to avoid blocking the event loop
+        content_parts = []
+        async for token in _stream_llm_to_sse(eng_system, eng_context, file_path, use_coder=True):
+            content_parts.append(token)
+            yield sse("file_delta", {"path": file_path, "delta": token})
+            await asyncio.sleep(0)  # yield control to event loop
+
+        content = "".join(content_parts)
         if not content:
             content = f"// {file_path}\n// Generated by Atoms Engine\n"
+            yield sse("file_delta", {"path": file_path, "delta": content})
+            await asyncio.sleep(0)
+
         content = re.sub(r'^```\w*\n?', '', content.strip())
         content = re.sub(r'\n?```$', '', content.strip())
         board.generated_files[file_path] = content
 
-        pos = 0
-        while pos < len(content):
-            chunk = content[pos:pos + TYPING_CHUNK]
-            yield sse("file_delta", {"path": file_path, "delta": chunk})
-            pos += TYPING_CHUNK
-            await asyncio.sleep(TYPING_DELAY)
-
         yield sse("file_end", {"path": file_path, "index": idx, "total": total})
         await asyncio.sleep(0.03)
 
-    yield sse("agent_end", {"agent": "engineer", "result": f"Wrote {total} files"})
+    yield sse("agent_end", {"agent": "engineer", "name": "Engineer", "icon": "code", "result": f"Wrote {total} files"})
 
     yield sse("discussion", {
         "from": "Engineer", "to": "QA Engineer", "icon": "code",
@@ -540,7 +711,7 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
         f"--- {p} ---\n{c[:800]}" for p, c in list(board.generated_files.items())[:8]
     )
 
-    qa_raw = _call_llm(
+    qa_raw = await _call_llm(
         AGENT_QA_SYSTEM,
         f"Project: {prompt}\nPRD: {json.dumps(prd)}\n\nReview these {len(board.generated_files)} files:\n{code_summary}",
         max_tokens=1024
@@ -556,7 +727,7 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
             "verdict": "PASS — Code is production-ready with minor suggestions"
         }
 
-    yield sse("agent_end", {"agent": "qa", "result": f"QA Score: {qa_result.get('overall_score', 'N/A')}/100 — {qa_result.get('verdict', 'Done')}"})
+    yield sse("agent_end", {"agent": "qa", "name": "QA Engineer", "icon": "shield", "result": f"QA Score: {qa_result.get('overall_score', 'N/A')}/100 — {qa_result.get('verdict', 'Done')}"})
     yield sse("blackboard_update", {"field": "qa_result", "value": qa_result})
 
     # QA discusses results with the team
@@ -596,23 +767,24 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
                 yield sse("agent_start", {"agent": "engineer", "name": "Engineer", "icon": "code", "description": f"Fixing: {bug_desc[:50]}..."})
 
                 fix_prompt = AGENT_ENGINEER_FIX.replace("{bug_description}", bug_desc).replace("{file_path}", bug_file).replace("{file_content}", board.generated_files[bug_file][:3000])
-                fixed = _call_llm("You are a bug-fixing engineer.", fix_prompt, max_tokens=2048)
+
+                # Stream fix tokens live (async to avoid blocking)
+                yield sse("file_start", {"path": bug_file, "index": 0, "total": 0})
+                fix_parts = []
+                async for token in _stream_llm_to_sse("You are a bug-fixing engineer.", fix_prompt, bug_file, max_tokens=2048, use_coder=True):
+                    fix_parts.append(token)
+                    yield sse("file_delta", {"path": bug_file, "delta": token})
+                    await asyncio.sleep(0)
+
+                fixed = "".join(fix_parts)
                 if fixed:
                     fixed = re.sub(r'^```\w*\n?', '', fixed.strip())
                     fixed = re.sub(r'\n?```$', '', fixed.strip())
                     board.generated_files[bug_file] = fixed
 
-                    # Live-write the fix
-                    yield sse("file_start", {"path": bug_file, "index": 0, "total": 0})
-                    pos = 0
-                    while pos < len(fixed):
-                        chunk = fixed[pos:pos + TYPING_CHUNK * 2]
-                        yield sse("file_delta", {"path": bug_file, "delta": chunk})
-                        pos += TYPING_CHUNK * 2
-                        await asyncio.sleep(TYPING_DELAY)
-                    yield sse("file_end", {"path": bug_file, "index": 0, "total": 0})
+                yield sse("file_end", {"path": bug_file, "index": 0, "total": 0})
 
-                yield sse("agent_end", {"agent": "engineer", "result": f"Fixed: {bug_desc[:60]}"})
+                yield sse("agent_end", {"agent": "engineer", "name": "Engineer", "icon": "code", "result": f"Fixed: {bug_desc[:60]}"})
                 await asyncio.sleep(0.05)
 
         yield sse("discussion", {
@@ -656,27 +828,53 @@ async def standard_pipeline(prompt: str, existing_files: dict) -> AsyncGenerator
     await asyncio.sleep(0.1)
 
     has_pkg = "package.json" in board.generated_files
-    if has_pkg:
-        yield sse("message", {"content": "Running npm install..."})
-        yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": "Installing dependencies..."})
-        success, output = _run_npm_install()
-        if success:
-            yield sse("message", {"content": "Dependencies installed. Starting dev server..."})
-        else:
-            yield sse("message", {"content": f"npm install warning: {output[:200]}"})
+    has_requirements = "requirements.txt" in board.generated_files
+    has_go_mod = "go.mod" in board.generated_files
+    has_pom = "pom.xml" in board.generated_files
+    has_cargo = "Cargo.toml" in board.generated_files
 
-        ok, msg, port = _start_dev_server()
+    if has_pkg:
+        frontend_dir = _find_frontend_dir(board.generated_files)
+        cwd = frontend_dir if frontend_dir else None
+        yield sse("message", {"content": "Running npm install...", "type": "stdout"})
+        yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": "Installing npm dependencies..."})
+        success = True
+        async for item in _run_npm_install_streaming(cwd=cwd):
+            if isinstance(item, int):
+                success = item == 0
+                break
+            line, is_stderr = item
+            yield sse("message", {"content": line, "type": "stderr" if is_stderr else "stdout"})
+        if success:
+            yield sse("message", {"content": "Dependencies installed. Starting dev server...", "type": "stdout"})
+        else:
+            yield sse("message", {"content": "npm install failed (see terminal output above).", "type": "stderr"})
+
+        ok, msg, port = _start_dev_server(cwd=cwd)
         if ok:
             preview_url = f"http://127.0.0.1:{port}"
             yield sse("preview_ready", {"url": preview_url, "port": port})
-            yield sse("message", {"content": f"Preview running at {preview_url}"})
+            yield sse("message", {"content": f"Preview running at {preview_url}", "type": "stdout"})
             yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": f"Deployed successfully! Live at port {port}."})
         else:
-            yield sse("message", {"content": f"Dev server: {msg}"})
+            yield sse("message", {"content": f"Dev server: {msg}", "type": "stderr"})
+    elif has_requirements:
+        yield sse("message", {"content": "Python project ready. Run: pip install -r requirements.txt && python main.py"})
+        yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": "Python project files written. User can install deps with pip and run the server."})
+    elif has_go_mod:
+        yield sse("message", {"content": "Go project ready. Run: go mod tidy && go run main.go"})
+        yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": "Go project files written. User can build with go build."})
+    elif has_pom:
+        yield sse("message", {"content": "Java project ready. Run: mvn spring-boot:run"})
+        yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": "Java project files written. User can build with Maven."})
+    elif has_cargo:
+        yield sse("message", {"content": "Rust project ready. Run: cargo run"})
+        yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": "Rust project files written. User can build with cargo."})
     else:
-        yield sse("message", {"content": "No package.json — skipping install."})
+        yield sse("message", {"content": "Project files written to disk."})
+        yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": "All project files deployed."})
 
-    yield sse("agent_end", {"agent": "devops", "result": "Project deployed"})
+    yield sse("agent_end", {"agent": "devops", "name": "DevOps", "icon": "rocket", "result": "Project deployed"})
 
     # Final team discussion
     yield sse("discussion", {
@@ -695,6 +893,10 @@ async def race_pipeline(prompt: str, existing_files: dict, num_teams: int = 2) -
     await asyncio.sleep(0.3)
     yield sse("agent_end", {"agent": "team_lead", "result": f"Race Mode: {num_teams} parallel teams competing"})
 
+    # Detect stack once for all race teams
+    race_stack = detect_stack(prompt)
+    race_architect_system = get_architect_prompt_for_stack(race_stack) if (race_stack.backend_framework or race_stack.frontend_framework or race_stack.languages) else AGENT_ARCHITECT_SYSTEM_DEFAULT
+
     yield sse("race_start", {"teams": num_teams})
     await asyncio.sleep(0.2)
 
@@ -708,7 +910,7 @@ async def race_pipeline(prompt: str, existing_files: dict, num_teams: int = 2) -
         board = Blackboard(prompt, existing_files)
 
         # PM phase
-        prd_raw = _call_llm(
+        prd_raw = await _call_llm(
             AGENT_PM_SYSTEM,
             f"Create a PRD for: {prompt}\n\n(Team {team_idx} — be creative with your approach)",
             temp=0.4 + (team_idx * 0.15),  # Different temperatures for diversity
@@ -721,14 +923,14 @@ async def race_pipeline(prompt: str, existing_files: dict, num_teams: int = 2) -
         yield sse("race_progress", {"team": team_idx, "status": "generating", "phase": "architecture"})
 
         # Architect phase
-        arch_raw = _call_llm(
-            AGENT_ARCHITECT_SYSTEM,
-            f"PRD: {json.dumps(prd)}\n\nDesign architecture. (Team {team_idx})",
+        arch_raw = await _call_llm(
+            race_architect_system,
+            f"PRD: {json.dumps(prd)}\n\nDesign architecture. (Team {team_idx})\nUser request: {prompt}",
             temp=0.3 + (team_idx * 0.1),
         )
         arch = _extract_json(arch_raw)
         if not arch or not isinstance(arch, dict) or "directory_structure" not in arch:
-            arch = {"stack": {"frontend": "React"}, "directory_structure": ["package.json", "src/App.jsx", "src/index.css"]}
+            arch = get_fallback_architecture(race_stack, prompt)
         board.architecture = arch
         board.file_plan = arch.get("directory_structure", [])
 
@@ -736,8 +938,8 @@ async def race_pipeline(prompt: str, existing_files: dict, num_teams: int = 2) -
 
         # Engineer phase
         for file_path in board.file_plan:
-            eng_system = AGENT_ENGINEER_SYSTEM.replace("{file_path}", file_path)
-            content = _call_llm(eng_system, f"PRD: {json.dumps(prd)}\nWrite: {file_path}\nRequest: {prompt}", temp=0.3 + (team_idx * 0.1))
+            eng_system = get_engineer_prompt_for_stack(race_stack, file_path)
+            content = await _call_llm(eng_system, f"PRD: {json.dumps(prd)}\nWrite: {file_path}\nRequest: {prompt}", temp=0.3 + (team_idx * 0.1), use_coder=True)
             if content:
                 content = re.sub(r'^```\w*\n?', '', content.strip())
                 content = re.sub(r'\n?```$', '', content.strip())
@@ -766,7 +968,7 @@ async def race_pipeline(prompt: str, existing_files: dict, num_teams: int = 2) -
 
         # Try LLM judge for more sophisticated scoring
         all_code = "\n\n".join(f"--- {p} ---\n{c[:500]}" for p, c in list(board.generated_files.items())[:5])
-        judge_raw = _call_llm(AGENT_JUDGE_SYSTEM, f"Evaluate this solution for: {prompt}\n\nCode:\n{all_code}")
+        judge_raw = await _call_llm(AGENT_JUDGE_SYSTEM, f"Evaluate this solution for: {prompt}\n\nCode:\n{all_code}")
         judge = _extract_json(judge_raw)
         if judge and isinstance(judge, dict) and "score" in judge:
             board.score = float(judge["score"])
@@ -805,19 +1007,155 @@ async def race_pipeline(prompt: str, existing_files: dict, num_teams: int = 2) -
     # Auto-deploy race winner
     yield sse("agent_start", {"agent": "devops", "name": "DevOps", "icon": "rocket", "description": "Deploying winning solution..."})
     _write_files_to_disk(winner.generated_files)
-    has_pkg = "package.json" in winner.generated_files
-    if has_pkg:
-        yield sse("message", {"content": "Installing dependencies..."})
-        _run_npm_install()
-        ok, msg, port = _start_dev_server()
+    frontend_dir = _find_frontend_dir(winner.generated_files)
+    if frontend_dir:
+        yield sse("message", {"content": "Installing dependencies...", "type": "stdout"})
+        success = True
+        async for item in _run_npm_install_streaming(cwd=frontend_dir):
+            if isinstance(item, int):
+                success = item == 0
+                break
+            line, is_stderr = item
+            yield sse("message", {"content": line, "type": "stderr" if is_stderr else "stdout"})
+        ok, msg, port = _start_dev_server(cwd=frontend_dir)
         if ok:
             yield sse("preview_ready", {"url": f"http://127.0.0.1:{port}", "port": port})
-            yield sse("message", {"content": f"Preview live at http://127.0.0.1:{port}"})
+            yield sse("message", {"content": f"Preview live at http://127.0.0.1:{port}", "type": "stdout"})
+        elif not success:
+            yield sse("message", {"content": "npm install failed.", "type": "stderr"})
     yield sse("agent_end", {"agent": "devops", "result": "Deployed"})
     yield sse("message", {"content": f"Done! {total} files created from the winning team. Project is live!"})
 
 
 # ─── Main Stream Generator ──────────────────────────────────────────────────
+
+async def _stream_unified_standard(prompt: str, files: dict) -> AsyncGenerator[str, None]:
+    """
+    Stream events from the unified PipelineRunner (single source of truth).
+
+    Legacy `standard_pipeline()` remains in this module for backward compatibility,
+    but new standard execution now routes through backend.core.pipeline_runner.
+    """
+    from backend.core.pipeline_runner import PipelineContext, PipelineRequest, run_pipeline
+    from backend.storage.artifact_store import flatten_structure, get_artifact_store
+
+    queue: asyncio.Queue = asyncio.Queue()
+    result_holder: dict = {}
+    sentinel = object()
+
+    def _emit(event_name: str, payload: dict) -> None:
+        queue.put_nowait((event_name, payload))
+
+    def _runner():
+        req = PipelineRequest(
+            idea=prompt,
+            mode="full",
+            channel="web",
+            user_id="atoms-stream",
+            project_id="atoms-stream",
+            token_tier="free",
+            memory_scope="project",
+        )
+        result_holder["result"] = run_pipeline(req, PipelineContext(on_event=_emit, strict_contracts=True))
+        queue.put_nowait((sentinel, {}))
+
+    asyncio.get_event_loop().run_in_executor(None, _runner)
+
+    event_map = {
+        "agent_started": "agent_start",
+        "agent_completed": "agent_end",
+        "agent_failed": "agent_error",
+        "state_transition": "blackboard_update",
+        "agent_retry": "message",
+        "run_started": "message",
+        "run_failed": "error",
+        "run_timeout": "error",
+        "run_finished": "message",
+    }
+
+    while True:
+        name, payload = await queue.get()
+        if name is sentinel:
+            break
+
+        sse_type = event_map.get(name, "message")
+        if sse_type == "agent_start":
+            yield sse(sse_type, {"agent": payload.get("agent", "unknown"), "description": f"Attempt {payload.get('attempt', 1)}"})
+        elif sse_type == "agent_end":
+            yield sse(sse_type, {"agent": payload.get("agent", "unknown"), "result": f"Completed in {payload.get('duration_ms', 0)}ms"})
+        elif sse_type == "agent_error":
+            yield sse("error", {"message": f"{payload.get('agent', 'agent')} failed: {payload.get('error', 'unknown error')}"})
+        elif sse_type == "blackboard_update":
+            yield sse("blackboard_update", {"field": "state", "value": payload.get("state")})
+        elif sse_type == "error":
+            yield sse("error", {"message": payload.get("error", payload.get("message", "pipeline error"))})
+        else:
+            message = payload.get("message") or payload.get("event") or name
+            yield sse("message", {"content": str(message)})
+
+    result = result_holder.get("result", {})
+    manifest = result.get("artifact_manifest") or {}
+    files_map = {}
+    if manifest.get("project_key") and manifest.get("version"):
+        try:
+            files_map = get_artifact_store().load_version(
+                project_key=manifest["project_key"],
+                version=int(manifest["version"]),
+            )
+        except Exception:
+            files_map = {}
+    if not files_map:
+        files_map = flatten_structure(result.get("agent_outputs", {}).get("coder", {}))
+
+    total = len(files_map)
+    for idx, (path, content) in enumerate(files_map.items(), start=1):
+        yield sse("file_start", {"path": path, "index": idx, "total": total})
+        yield sse("file_delta", {"path": path, "delta": content})
+        yield sse("file_end", {"path": path, "index": idx, "total": total})
+
+    state = result.get("state", "unknown")
+    yield sse("message", {"content": f"Unified pipeline finished with state={state}. Files: {total}"})
+
+    # ═══════════════════════════════════════════════════════════════
+    #  AUTO-DEPLOY: Write files to disk and start dev server for preview
+    # ═══════════════════════════════════════════════════════════════
+    if files_map:
+        yield sse("agent_start", {"agent": "devops", "name": "DevOps", "icon": "rocket", "description": "Deploying project..."})
+        yield sse("message", {"content": "Writing files to disk..."})
+        _write_files_to_disk(files_map)
+        await asyncio.sleep(0.1)
+
+        # Locate the frontend directory containing package.json with vite
+        frontend_dir = _find_frontend_dir(files_map)
+
+        if frontend_dir:
+            yield sse("message", {"content": f"Running npm install in {frontend_dir.name}/...", "type": "stdout"})
+            yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": "Installing npm dependencies..."})
+            success = True
+            async for item in _run_npm_install_streaming(cwd=frontend_dir):
+                if isinstance(item, int):
+                    success = item == 0
+                    break
+                line, is_stderr = item
+                yield sse("message", {"content": line, "type": "stderr" if is_stderr else "stdout"})
+            if success:
+                yield sse("message", {"content": "Dependencies installed. Starting dev server...", "type": "stdout"})
+            else:
+                yield sse("message", {"content": "npm install failed (see terminal output above).", "type": "stderr"})
+
+            ok, msg, port = _start_dev_server(cwd=frontend_dir)
+            if ok:
+                preview_url = f"http://127.0.0.1:{port}"
+                yield sse("preview_ready", {"url": preview_url, "port": port})
+                yield sse("message", {"content": f"Preview running at {preview_url}", "type": "stdout"})
+                yield sse("discussion", {"from": "DevOps", "to": "Team Leader", "icon": "rocket", "message": f"Deployed successfully! Live at port {port}."})
+            else:
+                yield sse("message", {"content": f"Dev server: {msg}", "type": "stderr"})
+        else:
+            yield sse("message", {"content": "Project files written to disk (no frontend package.json found for preview)."})
+
+        yield sse("agent_end", {"agent": "devops", "name": "DevOps", "icon": "rocket", "result": "Project deployed"})
+
 
 async def atoms_stream(prompt: str, files: dict, mode: str = "standard", race_teams: int = 2) -> AsyncGenerator[str, None]:
     try:
@@ -825,7 +1163,7 @@ async def atoms_stream(prompt: str, files: dict, mode: str = "standard", race_te
             async for event in race_pipeline(prompt, files, race_teams):
                 yield event
         else:
-            async for event in standard_pipeline(prompt, files):
+            async for event in _stream_unified_standard(prompt, files):
                 yield event
 
         yield sse("done", {"message": "Complete"})

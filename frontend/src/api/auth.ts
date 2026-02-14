@@ -3,6 +3,11 @@
  */
 
 import { apiFetch } from "@/lib/api";
+import {
+  getStoredToken as _getStoredToken,
+  setStoredToken as _setStoredToken,
+  clearStoredToken as _clearStoredToken,
+} from "@/lib/auth-storage";
 
 export interface LoginRequest {
   email: string;
@@ -27,19 +32,9 @@ export interface UserResponse {
   created_at: string;
 }
 
-const TOKEN_KEY = "vibecober_token";
-
-export function getStoredToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setStoredToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearStoredToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
+export const getStoredToken = _getStoredToken;
+export const setStoredToken = _setStoredToken;
+export const clearStoredToken = _clearStoredToken;
 
 export async function login(data: LoginRequest): Promise<TokenResponse> {
   return apiFetch<TokenResponse>("/auth/login", {

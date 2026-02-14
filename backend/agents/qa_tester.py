@@ -22,6 +22,7 @@ from dataclasses import dataclass
 import json
 import os
 
+from backend.agents.base_agent import BaseAgent
 from backend.engine.events import get_event_emitter, EngineEventType
 
 
@@ -59,9 +60,12 @@ class QAResult:
 
 # ─── QA Tester Agent ─────────────────────────────────────────────────────────
 
-class QATesterAgent:
+class QATesterAgent(BaseAgent):
     """
     QA Agent — Tests code against PRD requirements.
+    
+    Inherits from BaseAgent to route all LLM calls through the gateway
+    for proper cost tracking and budget enforcement.
     
     Responsibilities:
     1. Generate tests from PRD + code context
@@ -84,6 +88,7 @@ class QATesterAgent:
             prd: Product Requirements Document
             project_path: Path to project under test
         """
+        super().__init__()
         self.prd = prd
         self.project_path = project_path
         self.failure_count = 0
@@ -258,53 +263,13 @@ Output ONLY the test code. No explanations."""
         return str(self.prd)
     
     def _call_llm(self, prompt: str) -> Optional[str]:
-        """Call LLM for test generation."""
-        import requests
-        
-        # Try NIM first
-        api_key = os.getenv("NIM_API_KEY", "").strip()
-        if api_key:
-            model = os.getenv("NIM_MODEL", "meta/llama-3.3-70b-instruct")
-            try:
-                r = requests.post(
-                    "https://integrate.api.nvidia.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": model,
-                        "messages": [
-                            {"role": "system", "content": "You are a senior QA engineer. Output only test code."},
-                            {"role": "user", "content": prompt}
-                        ],
-                        "max_tokens": 2048,
-                        "temperature": 0.2,
-                    },
-                    timeout=60,
-                )
-                r.raise_for_status()
-                content = r.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-                return content.strip() if content.strip() else None
-            except Exception as e:
-                print(f"[QA] NIM error: {e}")
-        
-        # Fallback to Ollama
-        model = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2")
-        try:
-            r = requests.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": model,
-                    "prompt": prompt,
-                    "stream": False
-                },
-                timeout=60
-            )
-            r.raise_for_status()
-            return r.json().get("response", "").strip() or None
-        except Exception:
-            return None
+        """Call LLM for test generation via the gateway (cost-tracked)."""
+        return self.call_llm_simple(
+            system="You are a senior QA engineer. Output only test code.",
+            user=prompt,
+            max_tokens=2048,
+            temperature=0.2,
+        )
     
     def _clean_code(self, code: str) -> str:
         """Remove markdown fences from code."""

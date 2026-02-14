@@ -8,29 +8,30 @@ import { Settings, CreditCard, LogOut } from 'lucide-react';
 export default function AccountHoverPanel() {
     return (
         <div
-            className="absolute left-0 top-12 w-72 z-50
-                 bg-[#111] border border-[#1f1f1f]
-                 rounded-xl shadow-2xl shadow-black/50 p-4
-                 animate-in fade-in slide-in-from-top-2 duration-150"
+            className="absolute left-0 top-12 w-72 z-50 rounded-xl shadow-2xl shadow-black/50 p-4 animate-in fade-in slide-in-from-top-2 duration-150"
+            style={{
+                background: 'var(--ide-menu-bg)',
+                border: '1px solid var(--ide-menu-border)',
+            }}
         >
             {/* USER INFO */}
-            <div className="flex items-center gap-3 pb-3 border-b border-[#1f1f1f]">
+            <div className="flex items-center gap-3 pb-3" style={{ borderBottom: '1px solid var(--ide-menu-border)' }}>
                 <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-white font-medium text-lg">
                     A
                 </div>
                 <div className="flex-1">
-                    <p className="text-sm text-white font-medium">Annam Madhukar Reddy</p>
-                    <p className="text-xs text-gray-500">Free Plan</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--ide-text)' }}>Annam Madhukar Reddy</p>
+                    <p className="text-xs" style={{ color: 'var(--ide-text-muted)' }}>Free Plan</p>
                 </div>
             </div>
 
             {/* CREDITS */}
-            <div className="mt-3 p-3 bg-[#0a0a0a] rounded-lg">
-                <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+            <div className="mt-3 p-3 rounded-lg" style={{ background: 'var(--ide-credit-bg)' }}>
+                <div className="flex items-center justify-between text-xs mb-1.5" style={{ color: 'var(--ide-text-secondary)' }}>
                     <span>Credits remaining</span>
                     <span className="text-red-500 font-medium">0 left</span>
                 </div>
-                <div className="h-1.5 bg-[#1f1f1f] rounded-full overflow-hidden">
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--ide-progress-track)' }}>
                     <div
                         className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full"
                         style={{ width: '0%' }}
@@ -64,10 +65,18 @@ function MenuButton({
 }) {
     return (
         <button
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${danger
-                    ? 'text-red-400 hover:bg-red-500/10'
-                    : 'text-gray-300 hover:bg-[#1a1a1a] hover:text-white'
-                }`}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+            style={{
+                color: danger ? '#f87171' : 'var(--ide-text-secondary)',
+            }}
+            onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background = danger ? 'rgba(239,68,68,0.1)' : 'var(--ide-settings-item-hover)';
+                if (!danger) (e.currentTarget as HTMLElement).style.color = 'var(--ide-text)';
+            }}
+            onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background = 'transparent';
+                if (!danger) (e.currentTarget as HTMLElement).style.color = 'var(--ide-text-secondary)';
+            }}
         >
             {icon}
             {label}

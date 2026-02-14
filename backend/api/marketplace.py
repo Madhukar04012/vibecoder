@@ -58,10 +58,10 @@ async def install_atom(request: InstallRequest):
     
     source = Path(request.source_path)
     if not source.exists():
-        raise HTTPException(404, f"Source path not found: {request.source_path}")
+        raise HTTPException(status_code=404, detail=f"Source path not found: {request.source_path}")
     
     if not (source / "atom.yaml").exists():
-        raise HTTPException(400, "No atom.yaml found in source path")
+        raise HTTPException(status_code=400, detail="No atom.yaml found in source path")
     
     try:
         installed = registry.install(
@@ -73,9 +73,9 @@ async def install_atom(request: InstallRequest):
             "atom": installed.to_dict(),
         }
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(500, f"Install failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Install failed: {e}")
 
 
 @router.delete("/{atom_id}")
@@ -90,7 +90,7 @@ async def uninstall_atom(atom_id: str):
     if registry.uninstall(atom_id):
         return {"status": "uninstalled", "atom_id": atom_id}
     
-    raise HTTPException(404, f"Atom not found: {atom_id}")
+    raise HTTPException(status_code=404, detail=f"Atom not found: {atom_id}")
 
 
 @router.post("/{atom_id}/enable")
@@ -101,7 +101,7 @@ async def enable_atom(atom_id: str):
     if registry.enable(atom_id):
         return {"status": "enabled", "atom_id": atom_id}
     
-    raise HTTPException(404, f"Atom not found: {atom_id}")
+    raise HTTPException(status_code=404, detail=f"Atom not found: {atom_id}")
 
 
 @router.post("/{atom_id}/disable")
@@ -116,7 +116,7 @@ async def disable_atom(atom_id: str):
     if registry.disable(atom_id):
         return {"status": "disabled", "atom_id": atom_id}
     
-    raise HTTPException(404, f"Atom not found: {atom_id}")
+    raise HTTPException(status_code=404, detail=f"Atom not found: {atom_id}")
 
 
 @router.get("/{atom_id}")
@@ -128,7 +128,7 @@ async def get_atom(atom_id: str):
     if atom:
         return {"atom": atom.to_dict()}
     
-    raise HTTPException(404, f"Atom not found: {atom_id}")
+    raise HTTPException(status_code=404, detail=f"Atom not found: {atom_id}")
 
 
 @router.post("/{atom_id}/load")
@@ -139,10 +139,10 @@ async def load_atom(atom_id: str):
     
     atom = registry.get(atom_id)
     if not atom:
-        raise HTTPException(404, f"Atom not found: {atom_id}")
+        raise HTTPException(status_code=404, detail=f"Atom not found: {atom_id}")
     
     if not atom.enabled:
-        raise HTTPException(400, f"Atom is disabled: {atom_id}")
+        raise HTTPException(status_code=400, detail=f"Atom is disabled: {atom_id}")
     
     try:
         instance = loader.load_atom(atom.install_path, atom.manifest)
@@ -152,11 +152,11 @@ async def load_atom(atom_id: str):
             "wasm_support": loader.has_wasm_support,
         }
     except Exception as e:
-        raise HTTPException(500, f"Load failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Load failed: {e}")
 
 
 @router.post("/{atom_id}/run")
-async def run_atom(atom_id: str, context: dict = {}):
+async def run_atom(atom_id: str, context: Optional[dict] = None):
     """Execute an atom's main function."""
     loader = get_atom_loader()
     
@@ -166,8 +166,8 @@ async def run_atom(atom_id: str, context: dict = {}):
         registry = get_atom_registry()
         atom = registry.get(atom_id)
         if not atom:
-            raise HTTPException(404, f"Atom not found: {atom_id}")
+            raise HTTPException(status_code=404, detail=f"Atom not found: {atom_id}")
         instance = loader.load_atom(atom.install_path, atom.manifest)
     
-    result = instance.run(context)
+    result = instance.run(context or {})
     return {"result": result}

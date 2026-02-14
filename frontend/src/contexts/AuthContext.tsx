@@ -37,10 +37,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = useCallback(async (data: SignupRequest) => {
     await apiSignup(data);
-    // Auto-login after signup
-    await apiLogin({ email: data.email, password: data.password }).then(
-      (res) => setToken(res.access_token)
-    );
+    // Auto-login after signup; surface errors to caller
+    const res = await apiLogin({ email: data.email, password: data.password });
+    setToken(res.access_token);
   }, []);
 
   const logout = useCallback(() => {

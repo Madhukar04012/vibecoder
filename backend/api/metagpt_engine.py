@@ -24,7 +24,7 @@ logger = logging.getLogger("metagpt_engine")
 
 # NVIDIA NIM API (OpenAI-compatible)
 NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
-NIM_CODE_MODEL = "meta/llama-3.3-70b-instruct"
+NIM_CODE_MODEL = "minimaxai/minimax-m2.1"
 
 router = APIRouter(prefix="/api/agent", tags=["metagpt"])
 

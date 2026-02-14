@@ -1,240 +1,252 @@
 """
-Semantic Indexer — Phase-1
+Semantic memory indexer with scope and version governance.
 
-FAISS-based indexer for semantic code search.
-Indexes code chunks for retrieval during Engineer execution.
-
-Usage:
-    from memory.indexer import index_chunk, get_index_stats
-    
-    index_chunk("def hello(): print('world')", metadata={"file": "main.py"})
-    stats = get_index_stats()
+Memory can be isolated by project, user, or global scope and cleared per scope.
 """
 
+from __future__ import annotations
+
+import hashlib
+import threading
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
-from typing import Optional, List, Dict, Any
 
 
-# Index state
-_index = None
-_chunks: List[str] = []
-_metadata: List[Dict[str, Any]] = []
-_dimension = 384  # Embedding dimension
-
-
-def _init_index():
-    """Lazily initialize FAISS index."""
-    global _index
-    if _index is None:
-        try:
-            import faiss
-            _index = faiss.IndexFlatL2(_dimension)
-        except ImportError:
-            print("[Memory] FAISS not installed, using mock index")
-            _index = MockIndex(_dimension)
+DEFAULT_SCOPE_KEY = "global:v1"
+_DIMENSION = 384
 
 
 class MockIndex:
-    """Mock FAISS index for when FAISS isn't installed."""
-    
+    """Mock FAISS-compatible index used when faiss is unavailable."""
+
     def __init__(self, dimension: int):
         self.dimension = dimension
         self.vectors: List[np.ndarray] = []
-    
-    def add(self, vectors: np.ndarray):
-        for v in vectors:
-            self.vectors.append(v)
-    
-    def search(self, query: np.ndarray, k: int):
+
+    def add(self, vectors: np.ndarray) -> None:
+        for vector in vectors:
+            self.vectors.append(vector)
+
+    def search(self, query: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
         if not self.vectors:
             return np.array([[-1.0] * k]), np.array([[-1] * k])
-        
-        # Simple cosine-ish search
+
         k = min(k, len(self.vectors))
-        distances = []
-        for v in self.vectors:
-            dist = np.linalg.norm(query - v)
-            distances.append(dist)
-        
+        distances = [float(np.linalg.norm(query - vector)) for vector in self.vectors]
         indices = np.argsort(distances)[:k]
-        dists = np.array([distances[i] for i in indices])
-        
+        dists = np.array([distances[int(i)] for i in indices])
         return dists.reshape(1, -1), indices.reshape(1, -1)
-    
+
     @property
     def ntotal(self) -> int:
         return len(self.vectors)
 
 
-# ─── Embedding Model (Lazy Singleton) ───────────────────────────────────────
+@dataclass
+class ScopedIndex:
+    """In-memory scoped index store."""
 
-_embed_model = None
-_use_transformer = None
+    version: str
+    index: Any
+    chunks: List[str] = field(default_factory=list)
+    metadata: List[Dict[str, Any]] = field(default_factory=list)
+
+
+_LOCK = threading.Lock()
+_SCOPES: Dict[str, ScopedIndex] = {}
+
+
+_EMBED_MODEL = None
+_USE_TRANSFORMER: Optional[bool] = None
+
+
+def build_scope_key(
+    scope: str = "global",
+    project_id: str | None = None,
+    user_id: str | None = None,
+    version: str = "v1",
+) -> str:
+    """Build a canonical memory scope key."""
+    scope = (scope or "global").strip().lower()
+    version = (version or "v1").strip() or "v1"
+
+    if scope == "project":
+        if not project_id:
+            raise ValueError("project scope requires project_id")
+        return f"project:{project_id}:{version}"
+
+    if scope == "user":
+        if not user_id:
+            raise ValueError("user scope requires user_id")
+        return f"user:{user_id}:{version}"
+
+    if scope == "global":
+        return f"global:{version}"
+
+    # custom namespace
+    return f"{scope}:{version}"
+
+
+def _create_index() -> Any:
+    try:
+        import faiss
+
+        return faiss.IndexFlatL2(_DIMENSION)
+    except ImportError:
+        return MockIndex(_DIMENSION)
+
+
+def _ensure_scope(scope_key: str) -> ScopedIndex:
+    scoped = _SCOPES.get(scope_key)
+    if scoped is None:
+        version = scope_key.split(":")[-1] if ":" in scope_key else "v1"
+        scoped = ScopedIndex(version=version, index=_create_index())
+        _SCOPES[scope_key] = scoped
+    return scoped
 
 
 def _get_embed_model():
-    """Lazy-load sentence-transformers model."""
-    global _embed_model, _use_transformer
-    
-    if _use_transformer is not None:
-        return _embed_model
-    
+    global _EMBED_MODEL, _USE_TRANSFORMER
+
+    if _USE_TRANSFORMER is not None:
+        return _EMBED_MODEL
+
     try:
         from sentence_transformers import SentenceTransformer
-        _embed_model = SentenceTransformer("all-MiniLM-L6-v2")
-        _use_transformer = True
-        print("[Memory] Using sentence-transformers (all-MiniLM-L6-v2)")
+
+        _EMBED_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+        _USE_TRANSFORMER = True
     except ImportError:
-        _use_transformer = False
-        print("[Memory] sentence-transformers not installed, using hash embeddings")
-    
-    return _embed_model
+        _USE_TRANSFORMER = False
+
+    return _EMBED_MODEL
 
 
 def embed(text: str) -> np.ndarray:
-    """
-    Convert text to embedding vector.
-    
-    Uses sentence-transformers (all-MiniLM-L6-v2) when available.
-    Falls back to hash-based embedding otherwise.
-    
-    Args:
-        text: Text to embed
-        
-    Returns:
-        384-dimensional vector
-    """
+    """Embed text using sentence-transformers or deterministic hash fallback."""
     model = _get_embed_model()
-    
-    if model is not None and _use_transformer:
-        # Use real transformer embeddings
+    if model is not None and _USE_TRANSFORMER:
         vec = model.encode(text, show_progress_bar=False)
         return np.array(vec, dtype=np.float32)
-    
-    # Fallback: deterministic hash-based embedding
-    import hashlib
-    
-    result = []
+
+    result: List[float] = []
     for i in range(12):
-        variant = f"{i}:{text}"
-        h = hashlib.sha256(variant.encode()).digest()
-        result.extend([float(b) / 255.0 for b in h])
-    
-    arr = np.array(result[:_dimension], dtype=np.float32)
-    
-    # Normalize
+        digest = hashlib.sha256(f"{i}:{text}".encode("utf-8")).digest()
+        result.extend(float(byte) / 255.0 for byte in digest)
+
+    arr = np.array(result[:_DIMENSION], dtype=np.float32)
     norm = np.linalg.norm(arr)
     if norm > 0:
         arr = arr / norm
-    
     return arr
 
 
 def index_chunk(
     text: str,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
+    scope_key: str = DEFAULT_SCOPE_KEY,
 ) -> int:
-    """
-    Add a text chunk to the index.
-    
-    Args:
-        text: Code or text to index
-        metadata: Optional metadata (file path, etc.)
-        
-    Returns:
-        Index ID of the chunk
-    """
-    _init_index()
-    
-    vector = embed(text)
-    _index.add(vector.reshape(1, -1))
-    
-    _chunks.append(text)
-    _metadata.append(metadata or {})
-    
-    return len(_chunks) - 1
-
-
-def index_file(path: str, content: str) -> List[int]:
-    """
-    Index a file by splitting into chunks.
-    
-    Args:
-        path: File path
-        content: File content
-        
-    Returns:
-        List of chunk IDs
-    """
-    # Split by functions/classes or by lines
-    chunks = _split_into_chunks(content)
-    
-    ids = []
-    for chunk in chunks:
-        idx = index_chunk(chunk, {"file": path, "type": "code"})
-        ids.append(idx)
-    
-    return ids
+    """Add a text chunk to a scoped index."""
+    with _LOCK:
+        scoped = _ensure_scope(scope_key)
+        vector = embed(text)
+        scoped.index.add(vector.reshape(1, -1))
+        scoped.chunks.append(text)
+        scoped.metadata.append(metadata or {})
+        return len(scoped.chunks) - 1
 
 
 def _split_into_chunks(content: str, max_lines: int = 50) -> List[str]:
-    """Split content into indexable chunks."""
-    lines = content.split('\n')
-    chunks = []
-    
-    current_chunk = []
+    lines = content.split("\n")
+    chunks: List[str] = []
+    bucket: List[str] = []
+
     for line in lines:
-        current_chunk.append(line)
-        if len(current_chunk) >= max_lines:
-            chunks.append('\n'.join(current_chunk))
-            current_chunk = []
-    
-    if current_chunk:
-        chunks.append('\n'.join(current_chunk))
-    
+        bucket.append(line)
+        if len(bucket) >= max_lines:
+            chunks.append("\n".join(bucket))
+            bucket = []
+
+    if bucket:
+        chunks.append("\n".join(bucket))
+
     return chunks
 
 
-def search(query: str, k: int = 5) -> List[tuple[int, float, str, dict]]:
-    """
-    Search for similar chunks.
-    
-    Args:
-        query: Search query
-        k: Number of results
-        
-    Returns:
-        List of (id, distance, text, metadata) tuples
-    """
-    _init_index()
-    
-    if _index.ntotal == 0:
-        return []
-    
-    vector = embed(query)
-    distances, indices = _index.search(vector.reshape(1, -1), k)
-    
-    results = []
-    for dist, idx in zip(distances[0], indices[0]):
-        if idx >= 0 and idx < len(_chunks):
-            results.append((int(idx), float(dist), _chunks[idx], _metadata[idx]))
-    
-    return results
+def index_file(path: str, content: str, scope_key: str = DEFAULT_SCOPE_KEY) -> List[int]:
+    """Index a file by chunking it and storing chunks under a scope."""
+    chunk_ids: List[int] = []
+    for chunk in _split_into_chunks(content):
+        chunk_id = index_chunk(chunk, {"file": path, "type": "code"}, scope_key=scope_key)
+        chunk_ids.append(chunk_id)
+    return chunk_ids
 
 
-def get_index_stats() -> Dict[str, int]:
-    """Get index statistics."""
-    _init_index()
-    return {
-        "total_chunks": len(_chunks),
-        "index_size": _index.ntotal,
-        "dimension": _dimension,
-    }
+def search(
+    query: str,
+    k: int = 5,
+    scope_key: str = DEFAULT_SCOPE_KEY,
+) -> List[Tuple[int, float, str, Dict[str, Any]]]:
+    """Search similar chunks in the given scope."""
+    with _LOCK:
+        scoped = _ensure_scope(scope_key)
+        if scoped.index.ntotal == 0:
+            return []
+
+        vector = embed(query)
+        distances, indices = scoped.index.search(vector.reshape(1, -1), k)
+
+        results: List[Tuple[int, float, str, Dict[str, Any]]] = []
+        for distance, index in zip(distances[0], indices[0]):
+            idx = int(index)
+            if idx < 0 or idx >= len(scoped.chunks):
+                continue
+            results.append((idx, float(distance), scoped.chunks[idx], scoped.metadata[idx]))
+        return results
 
 
-def clear_index() -> None:
-    """Clear all indexed data."""
-    global _index, _chunks, _metadata
-    _index = None
-    _chunks = []
-    _metadata = []
+def list_scopes() -> List[str]:
+    """List all known memory scopes."""
+    with _LOCK:
+        return sorted(_SCOPES.keys())
+
+
+def get_index_stats(scope_key: str | None = None) -> Dict[str, Any]:
+    """Get stats for one scope or all scopes."""
+    with _LOCK:
+        if scope_key is not None:
+            scoped = _ensure_scope(scope_key)
+            return {
+                "scope": scope_key,
+                "version": scoped.version,
+                "total_chunks": len(scoped.chunks),
+                "index_size": scoped.index.ntotal,
+                "dimension": _DIMENSION,
+            }
+
+        scoped_stats = {}
+        for key in _SCOPES:
+            scoped = _SCOPES[key]
+            scoped_stats[key] = {
+                "version": scoped.version,
+                "total_chunks": len(scoped.chunks),
+                "index_size": scoped.index.ntotal,
+            }
+
+        return {
+            "scopes": scoped_stats,
+            "scope_count": len(scoped_stats),
+            "dimension": _DIMENSION,
+        }
+
+
+def clear_index(scope_key: str | None = None) -> None:
+    """Clear a single scope or all scopes."""
+    with _LOCK:
+        if scope_key is None:
+            _SCOPES.clear()
+            return
+
+        _SCOPES.pop(scope_key, None)

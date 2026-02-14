@@ -13,7 +13,7 @@ Endpoints:
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 from backend.engine.snapshot_manager import get_snapshot_manager
@@ -22,14 +22,37 @@ from backend.engine.atoms_engine import get_current_cost
 
 router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
 
+# Path validation: no traversal, reasonable length
+MAX_PATH_LEN = 2048
+MAX_LABEL_LEN = 256
+
+
+def _validate_path_no_traversal(v: str) -> str:
+    v = (v or "").strip()
+    if not v:
+        raise ValueError("Path must be non-empty")
+    if ".." in v or v.startswith("/") or "\\" in v:
+        raise ValueError("Path must be relative and must not contain traversal (.. or \\)")
+    return v
+
 
 class CreateSnapshotRequest(BaseModel):
-    project_path: str
-    label: str = ""
+    project_path: str = Field(..., min_length=1, max_length=MAX_PATH_LEN)
+    label: str = Field("", max_length=MAX_LABEL_LEN)
+
+    @field_validator("project_path")
+    @classmethod
+    def project_path_safe(cls, v: str) -> str:
+        return _validate_path_no_traversal(v)
 
 
 class RestoreSnapshotRequest(BaseModel):
-    target_path: str
+    target_path: str = Field(..., min_length=1, max_length=MAX_PATH_LEN)
+
+    @field_validator("target_path")
+    @classmethod
+    def target_path_safe(cls, v: str) -> str:
+        return _validate_path_no_traversal(v)
 
 
 @router.post("")

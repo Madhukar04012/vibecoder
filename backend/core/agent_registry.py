@@ -51,7 +51,7 @@ class AgentRegistry:
             name="auth",
             module="backend.agents.auth_agent",
             function="auth_agent",
-            dependencies=["planner"],
+            dependencies=["db_schema"],
             description="Generates authentication system"
         ))
         
@@ -66,7 +66,7 @@ class AgentRegistry:
         self.register(AgentSpec(
             name="tester",
             module="backend.agents.test_agent",
-            function="test_agent",
+            function="run_test_agent",
             dependencies=["coder"],
             description="Generates tests for the project"
         ))
@@ -77,6 +77,14 @@ class AgentRegistry:
             function="deploy_agent",
             dependencies=["tester"],
             description="Generates deployment configuration"
+        ))
+        
+        self.register(AgentSpec(
+            name="code_reviewer",
+            module="backend.agents.code_reviewer",
+            function="review_code",
+            dependencies=["coder"],
+            description="Reviews generated code for S-class quality standards"
         ))
     
     def register(self, spec: AgentSpec):

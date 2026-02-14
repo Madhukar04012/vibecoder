@@ -1,41 +1,124 @@
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Bell, Home, Settings } from "lucide-react";
-import { SettingsPanel } from "@/components/SettingsPanel";
+import { useIDEStore } from "@/stores/ide-store";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { SettingsPanel } from './SettingsPanel';
+import { Settings, Home, PlusCircle, FolderOpen, Sparkles, X } from 'lucide-react';
 
 export function ChatTopBar() {
+  const clearChat = useIDEStore((s) => s.clearChat);
+  const chatMessages = useIDEStore((s) => s.chatMessages);
+  const aiStatus = useIDEStore((s) => s.aiStatus);
+  const navigate = useNavigate();
+  const [showSettings, setShowSettings] = useState(false);
+
+  const handleNewChat = () => {
+    clearChat();
+  };
+
+  const handleHome = () => {
+    navigate('/dashboard');
+  };
+
+  const handleProject = () => {
+    navigate("/dashboard");
+  };
+
+  const handleSettings = () => {
+    setShowSettings(true);
+  };
+
+  const isActive = aiStatus === 'thinking' || aiStatus === 'generating' || aiStatus === 'streaming';
+
   return (
-    <nav className="shrink-0 border-b border-white/5 bg-[#0d0d0d] p-3 backdrop-blur-sm">
-      <div className="flex items-center justify-between">
-        <Button size="icon" className="rounded-full h-9 w-9" variant="ghost">
-          <Home className="h-5 w-5 text-white/60" />
-          <span className="sr-only">Home</span>
-        </Button>
-        
-        <Button
-          size="icon"
-          className="rounded-full h-9 w-9 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="sr-only">Notifications</span>
-        </Button>
-        
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button size="icon" className="rounded-full h-9 w-9" variant="ghost">
-              <Settings className="h-5 w-5 text-white/60" />
-              <span className="sr-only">Settings</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="w-[90vw] h-[90vh] max-w-[1500px] p-0 bg-[#1a1a1a] border-white/10">
-            <SettingsPanel />
-          </DialogContent>
-        </Dialog>
+    <div className="relative shrink-0">
+      {/* Header Bar */}
+      <div 
+        className="flex items-center justify-between px-4 py-3"
+        style={{ 
+          borderBottom: '1px solid var(--ide-border)',
+          background: 'var(--ide-surface)'
+        }}
+      >
+        {/* Logo & Title */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <Sparkles size={16} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-[14px] font-semibold" style={{ color: 'var(--ide-text)' }}>Videcoder</h1>
+            <p className="text-[10px]" style={{ color: 'var(--ide-text-muted)' }}>
+              {isActive ? (
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  AI is working...
+                </span>
+              ) : chatMessages.length > 0 ? (
+                `${chatMessages.length} messages`
+              ) : (
+                'Ready to build'
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleNewChat}
+            className="p-2 rounded-lg transition-all hover:bg-zinc-700/50"
+            style={{ color: 'var(--ide-text-muted)' }}
+            title="New chat"
+          >
+            <PlusCircle size={18} />
+          </button>
+          <button
+            onClick={handleHome}
+            className="p-2 rounded-lg transition-all hover:bg-zinc-700/50"
+            style={{ color: 'var(--ide-text-muted)' }}
+            title="Dashboard"
+          >
+            <Home size={18} />
+          </button>
+          <button
+            onClick={handleProject}
+            className="p-2 rounded-lg transition-all hover:bg-zinc-700/50"
+            style={{ color: 'var(--ide-text-muted)' }}
+            title="Projects"
+          >
+            <FolderOpen size={18} />
+          </button>
+          <button
+            onClick={handleSettings}
+            className="p-2 rounded-lg transition-all hover:bg-zinc-700/50"
+            style={{ color: 'var(--ide-text-muted)' }}
+            title="Settings"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
       </div>
-    </nav>
+
+      {/* Settings Panel Overlay */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}>
+          <div className="w-[95vw] h-[95vh] max-w-7xl rounded-xl overflow-hidden shadow-2xl border" style={{ background: 'var(--ide-bg)', borderColor: 'var(--ide-border)' }}>
+            <div className="h-full relative">
+              <SettingsPanel />
+              <button
+                onClick={() => setShowSettings(false)}
+                className="absolute top-4 right-4 z-[10000] p-2 rounded-lg hover:bg-zinc-700 transition-colors"
+                style={{
+                  background: 'var(--ide-surface)',
+                  color: 'var(--ide-text)',
+                  border: '1px solid var(--ide-border)'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

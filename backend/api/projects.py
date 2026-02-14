@@ -2,9 +2,12 @@
 Projects API Routes - CRUD for projects
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy.orm import Session
 from typing import List
+
+# UUID v4 string length; allow some margin for future formats
+PROJECT_ID_MAX_LEN = 64
 
 from backend.database import get_db
 from backend.models.user import User
@@ -26,14 +29,20 @@ def create_project(
     """
     project = Project(
         user_id=current_user.id,
-        idea=project_data.idea
+        name=project_data.name,
+        idea=project_data.idea or "",
     )
-    
-    db.add(project)
-    db.commit()
-    db.refresh(project)
-    
-    return project
+    try:
+        db.add(project)
+        db.commit()
+        db.refresh(project)
+        return project
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create project. Please try again.",
+        )
 
 
 @router.get("/", response_model=List[ProjectResponse])
@@ -53,9 +62,9 @@ def list_projects(
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(
-    project_id: str,
+    project_id: str = Path(..., min_length=1, max_length=PROJECT_ID_MAX_LEN),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get a specific project by ID.
@@ -76,9 +85,9 @@ def get_project(
 
 @router.delete("/{project_id}")
 def delete_project(
-    project_id: str,
+    project_id: str = Path(..., min_length=1, max_length=PROJECT_ID_MAX_LEN),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Delete a project.
@@ -91,10 +100,15 @@ def delete_project(
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found"
+            detail="Project not found",
         )
-    
-    db.delete(project)
-    db.commit()
-    
-    return {"message": "Project deleted"}
+    try:
+        db.delete(project)
+        db.commit()
+        return {"message": "Project deleted"}
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete project. Please try again.",
+        )

@@ -1,17 +1,12 @@
 /**
- * FilePanel - ATMOS Mode: Read-Only File Tree
- * 
- * ATMOS Rules:
- * - NO new file button
- * - NO file creation dialog
- * - Files ONLY appear via AI generation
- * - User can click to VIEW files (read-only)
+ * FilePanel - Professional File Explorer
+ * Clean, modern file tree with AI-generated indicators.
  */
 
 import { useMemo } from "react";
 import {
   FolderTree, File, FolderOpen, Folder, ChevronRight, ChevronDown,
-  Sparkles,
+  Sparkles, Search, FileCode, FileJson, FileText, Braces, Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIDEStore } from "@/stores/ide-store";
@@ -73,17 +68,29 @@ function buildTree(paths: string[], fileStatuses: Record<string, { isNew: boolea
   return convert(root);
 }
 
-// ─── File Icon ──────────────────────────────────────────────────────────────
+// ─── File Icon ────────────────────────────────────────────────────────────────
+
+const FILE_ICONS: Record<string, { icon: typeof File; color: string }> = {
+  ts: { icon: FileCode, color: "#3178c6" },
+  tsx: { icon: FileCode, color: "#3178c6" },
+  js: { icon: FileCode, color: "#f7df1e" },
+  jsx: { icon: FileCode, color: "#f7df1e" },
+  py: { icon: FileCode, color: "#3776ab" },
+  json: { icon: FileJson, color: "#f59e0b" },
+  css: { icon: Hash, color: "#06b6d4" },
+  html: { icon: Braces, color: "#f97316" },
+  md: { icon: FileText, color: "#6b7280" },
+  txt: { icon: FileText, color: "#6b7280" },
+  yml: { icon: FileJson, color: "#ef4444" },
+  yaml: { icon: FileJson, color: "#ef4444" },
+  env: { icon: File, color: "#22c55e" },
+};
 
 function FileIcon({ name }: { name: string }) {
   const ext = name.split(".").pop()?.toLowerCase() || "";
-  const colors: Record<string, string> = {
-    ts: "#3178c6", tsx: "#3178c6", js: "#f7df1e", jsx: "#f7df1e",
-    py: "#3776ab", json: "#6b7280", css: "#264de4", html: "#e34c26",
-    md: "#6b7280", yml: "#cb171e", yaml: "#cb171e", env: "#ecd53f",
-    txt: "#6b7280", svg: "#ff9a00", png: "#a855f7", jpg: "#a855f7",
-  };
-  return <File size={14} style={{ color: colors[ext] || "#6b7280" }} />;
+  const config = FILE_ICONS[ext] || { icon: File, color: "#6b7280" };
+  const IconComp = config.icon;
+  return <IconComp size={15} style={{ color: config.color }} />;
 }
 
 // ─── Tree Node Component ────────────────────────────────────────────────────
@@ -102,13 +109,17 @@ function TreeNodeItem({ node, level }: { node: TreeNode; level: number }) {
     <div>
       <div
         className={cn(
-          "flex items-center gap-1.5 h-[28px] px-2 text-[12px] cursor-pointer select-none transition-all duration-150",
-          isActive && "bg-blue-500/10 text-blue-300",
-          !isActive && "text-gray-400 hover:bg-[#1a1a1a] hover:text-gray-300",
-          isBeingGenerated && "bg-blue-500/5 animate-pulse",
-          node.isNew && !isActive && "text-emerald-400/80",
+          "flex items-center gap-2 h-[32px] px-2 text-[13px] cursor-pointer select-none transition-all duration-150 rounded-lg mx-1",
+          isActive && "bg-blue-500/15 text-blue-300",
+          isBeingGenerated && "bg-gradient-to-r from-blue-500/10 to-purple-500/10 animate-pulse",
+          node.isNew && !isActive && "text-emerald-400/90",
         )}
-        style={{ paddingLeft: 8 + level * 16 }}
+        style={{
+          paddingLeft: 8 + level * 14,
+          ...(!isActive && !node.isNew ? { color: 'var(--ide-text-secondary)' } : {}),
+        }}
+        onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--ide-surface-hover)'; }}
+        onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
         onClick={() => {
           if (isFolder) setOpen((o) => !o);
           else openFile(node.path);
@@ -116,34 +127,48 @@ function TreeNodeItem({ node, level }: { node: TreeNode; level: number }) {
       >
         {/* Folder chevron */}
         {isFolder ? (
-          open ? (
-            <ChevronDown size={12} className="text-gray-500 shrink-0" />
-          ) : (
-            <ChevronRight size={12} className="text-gray-500 shrink-0" />
-          )
+          <div className={cn("w-4 h-4 flex items-center justify-center rounded transition-transform", open && "rotate-90")}>
+            <ChevronRight size={14} style={{ color: 'var(--ide-text-muted)' }} />
+          </div>
         ) : (
-          <span className="w-3 shrink-0" />
+          <span className="w-4 shrink-0" />
         )}
 
         {/* Icon */}
         {isFolder ? (
-          open ? <FolderOpen size={14} className="text-blue-400/60 shrink-0" /> : <Folder size={14} className="text-gray-500 shrink-0" />
+          open ? (
+            <FolderOpen size={16} className="text-amber-400 shrink-0" />
+          ) : (
+            <Folder size={16} className="text-amber-400/70 shrink-0" />
+          )
         ) : (
           <FileIcon name={node.name} />
         )}
 
         {/* Name */}
-        <span className="truncate">{node.name}</span>
+        <span className="truncate flex-1">{node.name}</span>
 
         {/* AI badge */}
         {node.isAIGenerated && (
-          <Sparkles size={10} className="text-blue-400/50 shrink-0 ml-auto" />
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 shrink-0">
+            <Sparkles size={10} className="text-blue-400" />
+          </div>
+        )}
+        
+        {/* Generating indicator */}
+        {isBeingGenerated && (
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shrink-0" />
         )}
       </div>
 
       {/* Children */}
       {isFolder && open && node.children && (
-        <div>
+        <div className="relative">
+          {/* Indent guide line */}
+          <div 
+            className="absolute top-0 bottom-0 w-px opacity-20"
+            style={{ left: 16 + level * 14, background: 'var(--ide-text-muted)' }}
+          />
           {node.children.map((child) => (
             <TreeNodeItem key={child.id} node={child} level={level + 1} />
           ))}
@@ -153,7 +178,7 @@ function TreeNodeItem({ node, level }: { node: TreeNode; level: number }) {
   );
 }
 
-// ─── FilePanel ──────────────────────────────────────────────────────────────
+// ─── FilePanel ────────────────────────────────────────────────────────────────
 
 export default function FilePanel() {
   const fileContents = useIDEStore((s) => s.fileContents);
@@ -169,36 +194,42 @@ export default function FilePanel() {
   const fileCount = Object.keys(fileContents).length;
 
   return (
-    <div className="flex flex-col h-full w-full min-w-0 min-h-0 overflow-hidden" style={{ background: "#0b0b0b" }}>
-      {/* Header — NO new file button */}
-      <div className="shrink-0 px-3 py-2 flex items-center gap-2 text-[11px] text-white/60 border-b border-[#1a1a1a]">
-        <FolderTree size={13} />
-        <span className="font-medium uppercase tracking-wider">Explorer</span>
-        {fileCount > 0 && (
-          <span className="ml-auto text-white/30">{fileCount}</span>
-        )}
-
-        {/* AI progress */}
-        {aiStatus === 'generating' && (
-          <span className="text-[10px] text-blue-400 flex items-center gap-1">
-            <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
-            {aiFileProgress.current}/{aiFileProgress.total}
-          </span>
-        )}
+    <div className="flex flex-col h-full w-full min-w-0 min-h-0 overflow-hidden" style={{ background: "var(--ide-panel-bg)" }}>
+      {/* Header */}
+      <div className="shrink-0 px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--ide-border)' }}>
+        <div className="flex items-center gap-2">
+          <FolderTree size={16} className="text-blue-400" />
+          <span className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: 'var(--ide-text-muted)' }}>Explorer</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {fileCount > 0 && (
+            <span className="text-[11px] px-2 py-0.5 rounded-md" style={{ background: 'var(--ide-surface)', color: 'var(--ide-text-muted)' }}>
+              {fileCount} files
+            </span>
+          )}
+          {/* AI progress */}
+          {aiStatus === 'generating' && aiFileProgress && (
+            <span className="text-[11px] text-blue-400 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-500/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              {aiFileProgress.index}/{aiFileProgress.total}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Tree — view only, no create/rename/delete */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-1 overscroll-contain">
+      {/* File Tree */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-2 overscroll-contain">
         {tree.length > 0 ? (
           tree.map((node) => (
             <TreeNodeItem key={node.id} node={node} level={0} />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-full px-4 text-center">
-            <div className="text-white/20 mb-2">
-              <FolderOpen size={28} strokeWidth={1.5} />
+          <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'var(--ide-surface)' }}>
+              <FolderOpen size={28} className="text-zinc-500" />
             </div>
-            <p className="text-[12px] text-white/40">No files yet</p>
+            <p className="text-[14px] font-medium mb-1" style={{ color: 'var(--ide-text)' }}>No files yet</p>
+            <p className="text-[12px]" style={{ color: 'var(--ide-text-muted)' }}>Files will appear here when AI generates code</p>
           </div>
         )}
       </div>

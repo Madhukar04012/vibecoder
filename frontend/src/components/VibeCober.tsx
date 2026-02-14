@@ -460,7 +460,7 @@ const VibeCober: React.FC = () => {
                 },
                 {
                   title: 'Local AI, zero API cost',
-                  desc: 'Runs on your machine with Ollama/Mistral. No subscriptions.',
+                  desc: 'Powered by DeepSeek via NVIDIA NIM. No local install required.',
                 },
                 {
                   title: 'CLI + Web support',
@@ -640,8 +640,8 @@ const VibeCober: React.FC = () => {
             <div className="space-y-4 sm:space-y-6">
               {[
                 {
-                  q: 'How does local AI work?',
-                  a: 'Vibecoder uses Ollama to run AI models directly on your machine. No data leaves your computer.',
+                  q: 'How does the AI work?',
+                  a: 'Vibecoder uses NVIDIA NIM with DeepSeek. Set NIM_API_KEY in .env to connect. No local model install required.',
                 },
                 {
                   q: 'What languages are supported?',

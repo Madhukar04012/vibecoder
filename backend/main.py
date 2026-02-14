@@ -4,13 +4,24 @@ v0.6.1: MetaGPT-style architecture with Agents, Runs, Messages, Artifacts
 + Phase-2: Environment & Visualization (Terminal WS, Events)
 """
 
+import os
+import sys
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import logging
+
+# Configure logging before any other imports that may log
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stderr,
+    force=True,
+)
 
 from backend.database import Base, engine
 from backend.api import auth, projects, team_lead, tasks, agents, logs
@@ -27,6 +38,7 @@ from backend.api.hitl import router as hitl_router
 from backend.api.marketplace import router as marketplace_router
 from backend.api.snapshot import router as snapshot_router
 from backend.api.atmos import router as atmos_router
+from backend.api.pipeline_governance import router as pipeline_governance_router
 
 # Import all models to ensure they're registered
 from backend.models import (
@@ -36,21 +48,56 @@ from backend.models import (
 
 logger = logging.getLogger("vibecober")
 
+
+def _validate_env() -> None:
+    """Validate required environment variables on startup. Fail fast in production."""
+    env = os.getenv("ENV", "development").lower()
+    if env == "production":
+        required = ["DATABASE_URL", "JWT_SECRET_KEY"]
+        missing = [k for k in required if not os.getenv(k) or not str(os.getenv(k)).strip()]
+        if missing:
+            raise RuntimeError(
+                f"Production requires these environment variables: {', '.join(missing)}. "
+                "Set them in .env or the deployment environment."
+            )
+        secret = os.getenv("JWT_SECRET_KEY", "")
+        if secret in ("", "vibecober-dev-secret-change-in-production"):
+            raise RuntimeError(
+                "JWT_SECRET_KEY must be set to a strong secret in production. "
+                "Do not use the default dev value."
+            )
+    else:
+        if not os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET_KEY") == "your-super-secret-key-change-in-production":
+            logger.warning(
+                "JWT_SECRET_KEY is default or missing. Use a strong secret in production."
+            )
+
+
 # Create all database tables
 Base.metadata.create_all(bind=engine)
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Lifespan: validate env on startup; no shutdown work required."""
+    _validate_env()
+    yield
+
 
 # Initialize FastAPI app
 app = FastAPI(
     title="VibeCober API",
     description="AI-powered project generator with multi-agent architecture (MetaGPT-style)",
-    version="0.7.0"
+    version="0.7.0",
+    lifespan=_lifespan,
 )
 
-# CORS middleware - allow all origins for local dev (browser fetch from any port)
+# CORS: set CORS_ORIGINS in production (e.g. "https://app.example.com"); default "*" for dev
+_cors_origins = os.getenv("CORS_ORIGINS", "*").strip()
+_cors_list = [o.strip() for o in _cors_origins.split(",") if o.strip()] if _cors_origins != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,  # Required when using allow_origins=["*"]
+    allow_origins=_cors_list,
+    allow_credentials=False if _cors_list == ["*"] else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -101,6 +148,9 @@ app.include_router(snapshot_router)
 
 # ATMOS: AI-Only Autonomous Pipeline
 app.include_router(atmos_router)
+
+# Unified Pipeline Governance
+app.include_router(pipeline_governance_router)
 
 
 # ---------- Global exception handler ----------

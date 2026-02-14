@@ -16,6 +16,7 @@ Usage:
     print(ledger.by_agent)          # {"product_manager": {...}, "engineer": {...}}
 """
 
+import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, Optional
@@ -69,6 +70,7 @@ class TokenLedger:
     """
     
     def __init__(self):
+        self._lock = threading.Lock()
         self._agents: Dict[str, AgentUsage] = defaultdict(AgentUsage)
         self._run_id: str | None = None
         self._budget: Optional[float] = None  # None = unlimited
@@ -132,13 +134,14 @@ class TokenLedger:
         Raises:
             BudgetExceededError: If recording would exceed the budget
         """
-        # Check budget before recording
-        if self._budget is not None and cost > 0:
-            projected = self.total_cost + cost
-            if projected > self._budget:
-                raise BudgetExceededError(self._budget, self.total_cost, cost)
-        
-        self._agents[agent_name].add(input_tokens, output_tokens, cost)
+        with self._lock:
+            # Check budget before recording
+            if self._budget is not None and cost > 0:
+                projected = self.total_cost + cost
+                if projected > self._budget:
+                    raise BudgetExceededError(self._budget, self.total_cost, cost)
+            
+            self._agents[agent_name].add(input_tokens, output_tokens, cost)
     
     def record_simple(self, agent_name: str, tokens: int, cost: float) -> None:
         """
@@ -148,8 +151,18 @@ class TokenLedger:
             agent_name: Name of the agent
             tokens: Total tokens (counted as output for simplicity)
             cost: Cost in USD
+            
+        Raises:
+            BudgetExceededError: If recording would exceed the budget
         """
-        self._agents[agent_name].add(0, tokens, cost)
+        with self._lock:
+            # Check budget before recording (same enforcement as record())
+            if self._budget is not None and cost > 0:
+                projected = self.total_cost + cost
+                if projected > self._budget:
+                    raise BudgetExceededError(self._budget, self.total_cost, cost)
+            
+            self._agents[agent_name].add(0, tokens, cost)
     
     @property
     def total_tokens(self) -> int:

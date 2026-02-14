@@ -32,7 +32,6 @@ High-level map for developers. Entry points: **Backend** `backend/main.py`, **Fr
 | **memory/** | Indexer (FAISS), retriever — used by atoms engine |
 | **marketplace/** | Atom manifest, registry |
 | **services/** | Deployment, diff engine, testing |
-| **storage/** | Snapshot manager (file-based) |
 | **tools/** | Shell executor, MCP manager |
 | **communication/** | Presence, sync engine (events) |
 | **generator/** | project_builder (merge agent outputs) |
@@ -65,6 +64,7 @@ High-level map for developers. Entry points: **Backend** `backend/main.py`, **Fr
 - **backend/memory/distributed_memory.py** — Redis-backed distributed memory; not referenced anywhere.
 - **backend/storage/vector_cache.py** — Redis-backed embedding cache; not referenced anywhere.
 - **frontend/src/lib/monaco-atoms-theme.ts** — Monaco theme/options; editor uses inline `vs-dark` and options.
+- **backend/storage/snapshot_manager.py** — Legacy snapshot manager; replaced by `backend/engine/snapshot_manager.py`.
 
 ---
 

@@ -174,11 +174,34 @@ atexit.register(_cleanup_preview_processes)
 
 # ============== Helper Functions ==============
 
+def _validate_project_id(project_id: str) -> None:
+    """Reject path traversal and empty project_id."""
+    if not project_id or not project_id.strip():
+        raise ValueError("project_id is required")
+    if ".." in project_id or "/" in project_id or "\\" in project_id or os.path.isabs(project_id):
+        raise ValueError("Invalid project_id")
+
+
 def get_project_path(project_id: str) -> str:
-    """Get the absolute path for a project (demo: uses generated_projects folder)"""
-    base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "generated_projects")
-    project_path = os.path.join(base_path, project_id)
+    """Get the absolute path for a project (demo: uses generated_projects folder). Resolved path is under base."""
+    _validate_project_id(project_id)
+    base_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "generated_projects"))
+    project_path = os.path.abspath(os.path.join(base_path, project_id.strip()))
+    if not project_path.startswith(base_path):
+        raise ValueError("Invalid project_id")
     return project_path
+
+
+def _safe_relative_path(path: str, base_path: str) -> str:
+    """Resolve path under base_path; reject traversal."""
+    if not path or not path.strip():
+        raise ValueError("path is required")
+    if ".." in path or os.path.isabs(path) or path.startswith("/"):
+        raise ValueError("Invalid path")
+    resolved = os.path.abspath(os.path.join(base_path, path))
+    if not resolved.startswith(base_path):
+        raise ValueError("Invalid path: escape outside project")
+    return resolved
 
 def build_file_tree(path: str, base_path: str = "") -> List[FileNode]:
     """Build a file tree from a directory"""
@@ -218,7 +241,7 @@ def build_file_tree(path: str, base_path: str = "") -> List[FileNode]:
 def _run_planner(prompt: str) -> PlanSchema:
     """Run planner: LLM when available, else safe fallback. Never mutates files."""
     try:
-        from backend.core.llm_client import call_ollama
+        from backend.core.llm_client import call_llm
 
         system_prompt = '''You are an architect. Output ONLY a valid JSON object, no other text.
 Format:
@@ -232,7 +255,7 @@ Rules:
 - Only output the JSON object, nothing else'''
 
         full_prompt = f"{system_prompt}\n\nUser request: {prompt}\n\nJSON:"
-        result = call_ollama(full_prompt)
+        result = call_llm(full_prompt)
 
         if result and isinstance(result, dict):
             summary = result.get("summary") or "AI-generated plan"
@@ -315,8 +338,8 @@ Rules:
     user_prompt = f"Plan: {plan.summary}\n\nModify files: {', '.join(files_to_modify)}\n\n{context_block}\n\nJSON:"
 
     try:
-        from backend.core.llm_client import call_ollama
-        result = call_ollama(system_prompt + "\n\n" + user_prompt)
+        from backend.core.llm_client import call_llm
+        result = call_llm(system_prompt + "\n\n" + user_prompt)
         if result and isinstance(result, dict):
             summary = str(result.get("summary", plan.summary))[:500]
             diffs_raw = result.get("diffs")
@@ -362,6 +385,26 @@ def _run_engineer(plan: PlanSchema, file_path: str) -> str:
         "json": "JSON",
         "css": "CSS",
         "html": "HTML",
+        "go": "Go",
+        "rs": "Rust",
+        "java": "Java",
+        "kt": "Kotlin",
+        "rb": "Ruby",
+        "php": "PHP",
+        "cs": "C#",
+        "swift": "Swift",
+        "dart": "Dart",
+        "vue": "Vue",
+        "svelte": "Svelte",
+        "sql": "SQL",
+        "sh": "Shell",
+        "yaml": "YAML",
+        "yml": "YAML",
+        "toml": "TOML",
+        "xml": "XML",
+        "scss": "SCSS",
+        "sass": "SASS",
+        "less": "LESS",
     }.get(ext, "code")
 
     system_prompt = f"""You are a senior software engineer.
@@ -396,8 +439,8 @@ FAILURE BEHAVIOR:
     user_prompt = f"Plan: {plan.summary}\n\nCreate file: {file_path}\n\nJSON:"
 
     try:
-        from backend.core.llm_client import call_ollama
-        result = call_ollama(system_prompt + "\n\n" + user_prompt)
+        from backend.core.llm_client import call_llm
+        result = call_llm(system_prompt + "\n\n" + user_prompt)
         if result and isinstance(result, dict) and "content" in result:
             raw = result.get("content", "")
             if isinstance(raw, str):
@@ -418,8 +461,11 @@ async def engineer(request: EngineerRequest):
 @router.get("/project/{project_id}", response_model=List[FileNode])
 async def get_project(project_id: str):
     """Get project file tree"""
-    project_path = get_project_path(project_id)
-    
+    try:
+        project_path = get_project_path(project_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if not os.path.exists(project_path):
         # Return demo structure for non-existent projects
         return [
@@ -445,8 +491,11 @@ async def get_project(project_id: str):
 @router.get("/file", response_model=FileContentResponse)
 async def get_file(project_id: str, path: str):
     """Get file content"""
-    project_path = get_project_path(project_id)
-    file_path = os.path.join(project_path, path)
+    try:
+        project_path = get_project_path(project_id)
+        file_path = _safe_relative_path(path, project_path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     
     # Demo content for non-existent files
     demo_contents = {
@@ -549,17 +598,12 @@ CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Send a message to the AI team and get responses"""
-    from backend.core.llm_client import nim_chat, ollama_chat
+    """Send a message to the AI team and get responses (NIM/DeepSeek pipeline)."""
+    from backend.core.llm_client import nim_chat
 
     prompt = f"You are a helpful coding assistant. The user said: {request.message}\n\nRespond briefly and helpfully."
 
-    # 1. Try NVIDIA NIM (user's API key)
     reply = nim_chat(prompt)
-
-    # 2. Fallback to Ollama
-    if not reply:
-        reply = ollama_chat(prompt)
 
     if reply:
         return ChatResponse(
@@ -567,11 +611,10 @@ async def chat(request: ChatRequest):
             finished=True
         )
 
-    # 3. Fallback when no AI available
     return ChatResponse(
         messages=[ChatMessage(
             agent="assistant",
-            content=f"Sure! You said: \"{request.message}\". (Set NIM_API_KEY in .env for AI replies.)",
+            content=f"Sure! You said: \"{request.message}\". (Set NIM_API_KEY in .env for AI replies via DeepSeek/NIM.)",
             type="text"
         )],
         finished=True
@@ -580,9 +623,12 @@ async def chat(request: ChatRequest):
 @router.post("/apply", response_model=ApplyResponse)
 async def apply_change(request: ApplyRequest):
     """Apply a file change (create or overwrite)"""
-    project_path = get_project_path(request.project_id)
-    file_path = os.path.join(project_path, request.file_path)
-    
+    try:
+        project_path = get_project_path(request.project_id)
+        file_path = _safe_relative_path(request.file_path, project_path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     try:
         # Create directory if needed
         parent = os.path.dirname(file_path)
@@ -599,8 +645,11 @@ async def apply_change(request: ApplyRequest):
 @router.post("/run", response_model=RunResponse)
 async def run_command(request: RunRequest):
     """Run a project command"""
-    project_path = get_project_path(request.project_id)
-    
+    try:
+        project_path = get_project_path(request.project_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     command_map = {
         "run": "python -m uvicorn backend.main:app --reload",
         "test": "python -m pytest tests/ -v",
@@ -631,7 +680,10 @@ async def run_command(request: RunRequest):
 @router.post("/execute", response_model=RunResponse)
 async def execute_command(request: ExecuteRequest):
     """Phase 3: Run arbitrary command in project directory (e.g. npm install, npm run build)"""
-    project_path = get_project_path(request.project_id)
+    try:
+        project_path = get_project_path(request.project_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     os.makedirs(project_path, exist_ok=True)
 
     try:
@@ -698,7 +750,10 @@ def _start_preview_process(project_path: str, port: int, is_node: bool, backend_
 async def preview_start(request: PreviewStartRequest):
     """Start dev server for project preview. Returns URL when ready."""
     project_id = request.project_id
-    project_path = get_project_path(project_id)
+    try:
+        project_path = get_project_path(project_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Kill existing process for this project
     if project_id in _preview_processes:

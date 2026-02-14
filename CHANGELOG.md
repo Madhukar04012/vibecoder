@@ -2,6 +2,15 @@
 
 All notable changes to VibeCober.
 
+## [Unreleased]
+
+### Changed
+
+- **LLM pipeline**: Ollama removed; all LLM calls use NVIDIA NIM / DeepSeek only. Set `NIM_API_KEY` and `NIM_MODEL` in `.env`.
+- **.env.example**: Removed `OLLAMA_PATH`; pipeline is NIM/DeepSeek only.
+
+---
+
 ## [0.6.2] - 2026-02-09
 
 ### Removed (Dead Code & Unused Assets)

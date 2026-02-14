@@ -6,7 +6,7 @@ Production-ready schemas for API input/output
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from backend.models.enums import TaskStatus, TaskPriority, AgentRole
 
@@ -22,13 +22,12 @@ class TaskBase(BaseModel):
 
 class TaskRead(TaskBase):
     """Schema for reading task data (API response)"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     project_id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 
 
 class TaskCreate(BaseModel):

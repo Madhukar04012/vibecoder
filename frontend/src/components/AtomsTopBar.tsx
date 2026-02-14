@@ -39,7 +39,7 @@ export function AtomsTopBar({
   return (
     <header
       className="w-full flex items-center h-[42px] border-b text-[12px] select-none"
-      style={{ background: "#111", borderColor: "#1e1e1e", color: "#e5e5e5" }}
+      style={{ background: "var(--ide-topbar-bg)", borderColor: "var(--ide-border)", color: "var(--ide-text)" }}
     >
       {/* LEFT: App Icon + Project Info */}
       <div className="flex items-center gap-2 pl-2">
@@ -57,12 +57,12 @@ export function AtomsTopBar({
         </div>
 
         {/* Project Badge */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1a1a1a] border border-[#222]">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md" style={{ background: 'var(--ide-surface-hover)', border: '1px solid var(--ide-border)' }}>
           <div
             className="w-2 h-2 rounded-full transition-colors"
             style={{ backgroundColor: phaseInfo.color }}
           />
-          <span className="text-gray-300 font-medium truncate max-w-[160px]">
+          <span className="font-medium truncate max-w-[160px]" style={{ color: 'var(--ide-text-secondary)' }}>
             {projectName || "New Project"}
           </span>
         </div>
@@ -92,17 +92,18 @@ export function AtomsTopBar({
 
       {/* CENTER: View Switcher (indicators only — do NOT trigger execution) */}
       <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center h-[28px] rounded-lg bg-[#1a1a1a] border border-[#222] overflow-hidden">
+        <div className="flex items-center h-[28px] rounded-lg overflow-hidden" style={{ background: 'var(--ide-surface-hover)', border: '1px solid var(--ide-border)' }}>
           {views.map((v) => (
             <button
               key={v.id}
               onClick={() => setView(v.id)}
               className={cn(
                 "flex items-center gap-1.5 px-3 h-full text-[12px] transition-all duration-150",
-                view === v.id
-                  ? "bg-[#2a2a2a] text-white"
-                  : "text-gray-500 hover:text-gray-300 hover:bg-[#1e1e1e]",
               )}
+              style={{
+                background: view === v.id ? 'var(--ide-settings-sidebar)' : 'transparent',
+                color: view === v.id ? 'var(--ide-text)' : 'var(--ide-text-muted)',
+              }}
             >
               {v.icon}
               <span>{v.label}</span>

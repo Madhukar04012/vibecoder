@@ -72,10 +72,12 @@ def _detect_project_type(prompt: str) -> str:
     return "react"
 
 
+
 def _call_nim_for_code(prompt: str, file_path: str, project_context: str = "") -> str | None:
     import requests
-    api_key = os.getenv("NIM_API_KEY", "").strip()
-    if not api_key:
+    nim_key = os.getenv("NIM_CODER_API_KEY", "").strip() or os.getenv("NIM_API_KEY", "").strip()
+
+    if not nim_key:
         return None
     ext = file_path.rsplit(".", 1)[-1] if "." in file_path else ""
     lang = {"py": "Python", "ts": "TypeScript", "tsx": "TypeScript React", "js": "JavaScript",
@@ -89,15 +91,15 @@ Rules:
 - Follow best practices for {lang}"""
     if project_context:
         system_msg += f"\n\nProject context:\n{project_context}"
-    model = os.getenv("NIM_MODEL", "meta/llama-3.3-70b-instruct")
+    model = os.getenv("NIM_CODER_MODEL", os.getenv("NIM_MODEL", "qwen/qwen2.5-coder-32b-instruct"))
     try:
         r = requests.post(
             "https://integrate.api.nvidia.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {nim_key}", "Content-Type": "application/json"},
             json={"model": model, "messages": [
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": f"User request: {prompt}\n\nGenerate the complete file: {file_path}"},
-            ], "max_tokens": 2048, "temperature": 0.3},
+            ], "max_tokens": 8192, "temperature": 0.2, "top_p": 0.7},
             timeout=60,
         )
         r.raise_for_status()
@@ -112,37 +114,26 @@ Rules:
 
 def _call_nim_chat(prompt: str, context: str = "") -> str | None:
     import requests
-    api_key = os.getenv("NIM_API_KEY", "").strip()
-    if not api_key:
+    nim_key = os.getenv("NIM_API_KEY", "").strip()
+
+    if not nim_key:
         return None
-    model = os.getenv("NIM_MODEL", "meta/llama-3.3-70b-instruct")
+    model = os.getenv("NIM_MODEL", "minimaxai/minimax-m2.1")
     system_msg = "You are a helpful AI coding assistant in an IDE. Be concise and helpful."
     if context:
         system_msg += f"\n\nCurrent project files:\n{context}"
     try:
         r = requests.post(
             "https://integrate.api.nvidia.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {nim_key}", "Content-Type": "application/json"},
             json={"model": model, "messages": [
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": prompt},
-            ], "max_tokens": 512, "temperature": 0.5},
+            ], "max_tokens": 8192, "temperature": 1, "top_p": 0.95},
             timeout=30,
         )
         r.raise_for_status()
         return r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip() or None
-    except Exception:
-        return None
-
-
-def _call_ollama_chat(prompt: str) -> str | None:
-    import requests
-    model = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2")
-    try:
-        r = requests.post("http://localhost:11434/api/generate",
-                          json={"model": model, "prompt": prompt, "stream": False}, timeout=30)
-        r.raise_for_status()
-        return r.json().get("response", "").strip() or None
     except Exception:
         return None
 
@@ -162,8 +153,8 @@ def _is_code_request(prompt: str) -> bool:
 
 # ─── Live Code Writing Speed ─────────────────────────────────────────────────
 # Characters per chunk for live typing effect (higher = faster)
-TYPING_CHARS_PER_CHUNK = 8
-TYPING_DELAY_MS = 0.008  # delay between chunks in seconds
+TYPING_CHARS_PER_CHUNK = 32
+TYPING_DELAY_MS = 0.003  # delay between chunks in seconds
 
 
 # ─── Stream Generator with Live Code Writing ─────────────────────────────────
@@ -263,7 +254,7 @@ async def stream_generator(prompt: str, existing_files: dict) -> AsyncGenerator[
                 await asyncio.sleep(0.05)
 
                 # ── Generate code (AI or template) ──
-                content = _call_nim_for_code(prompt, file_path, project_context)
+                content = await asyncio.to_thread(_call_nim_for_code, prompt, file_path, project_context)
                 if not content:
                     content = default_content
 
@@ -305,9 +296,8 @@ async def stream_generator(prompt: str, existing_files: dict) -> AsyncGenerator[
             await asyncio.sleep(0.3)
 
             file_list_str = ", ".join(list(existing_files.keys())[:20]) if existing_files else "none"
-            reply = _call_nim_chat(prompt, f"Files: {file_list_str}")
-            if not reply:
-                reply = _call_ollama_chat(prompt)
+            reply = await asyncio.to_thread(_call_nim_chat, prompt, f"Files: {file_list_str}")
+            
             if not reply:
                 reply = f'I can help with that! Try asking me to "create a todo app" or "build a landing page".'
 

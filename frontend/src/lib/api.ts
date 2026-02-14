@@ -2,6 +2,8 @@
  * API client for VibeCober backend
  */
 
+import { getStoredToken } from "@/lib/auth-storage";
+
 // When served from same origin (single-server mode), use relative URLs
 const API_BASE =
   import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? "" : "http://127.0.0.1:8000");
@@ -21,7 +23,7 @@ export async function apiFetch<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = getApiUrl(path);
-  const token = localStorage.getItem("vibecober_token");
+  const token = getStoredToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),

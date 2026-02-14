@@ -1,9 +1,9 @@
 """
-LLM Client - Interface to Ollama and NVIDIA NIM for AI inference
+LLM Client - NVIDIA NIM / DeepSeek for AI inference (single pipeline).
+All LLM calls go through NIM; no local Ollama.
 """
 
 import os
-import subprocess
 
 # Ensure .env is loaded
 try:
@@ -17,134 +17,138 @@ import re
 import sys
 
 
-def _get_ollama_path() -> str:
-    """Get Ollama executable path - cross-platform."""
-    env_path = os.getenv("OLLAMA_PATH")
-    if env_path:
-        return env_path
-    if sys.platform == "win32":
-        return os.path.expanduser("~\\AppData\\Local\\Programs\\Ollama\\ollama.exe")
-    # Linux/macOS - ollama is typically in PATH
-    return "ollama"
-
-
-def call_ollama(prompt: str, model: str = "mistral"):
-    """
-    Call local Ollama model and return parsed JSON response.
-    Returns None if anything fails (timeout, parse error, etc.)
-    """
-    timeout = int(os.getenv("OLLAMA_TIMEOUT", "120"))
-    try:
-        ollama_path = _get_ollama_path()
-        result = subprocess.run(
-            [ollama_path, "run", model],
-            input=prompt,
-            capture_output=True,
-            timeout=timeout,
-            encoding='utf-8',
-            errors='replace'
-        )
-
-        output = result.stdout.strip() if result.stdout else ""
-        
-        if not output:
-            print("[LLM] Empty response from model")
-            return None
-
-        # Extract JSON: find outermost { } pair (handles nested JSON for planner/engineer)
-        json_start = output.find("{")
-        if json_start == -1:
-            print("[LLM] No JSON found in response")
-            return None
-
-        depth = 0
-        json_end = -1
-        for i in range(json_start, len(output)):
-            if output[i] == "{":
-                depth += 1
-            elif output[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    json_end = i + 1
-                    break
-
-        json_str = output[json_start:json_end] if json_end > json_start else output[json_start:]
-        if not json_str.endswith("}"):
-            json_str = output[json_start:output.rfind("}") + 1]  # fallback to last }
-
-        # Fix common LLM JSON issues
-        json_str = json_str.replace("'", '"')
-        json_str = re.sub(r',\s*}', '}', json_str)  # trailing commas in objects
-        json_str = re.sub(r',\s*]', ']', json_str)  # trailing commas in arrays
-        
-        return json.loads(json_str)
-
-    except subprocess.TimeoutExpired:
-        print("[LLM] Request timed out (model may still be loading)")
-        return None
-    except json.JSONDecodeError as e:
-        print(f"[LLM] JSON parse error: {e}")
-        return None
-    except FileNotFoundError:
-        print("[LLM] Ollama not found - make sure it's installed")
-        return None
-    except Exception as e:
-        print(f"[LLM] Unexpected error: {e}")
-        return None
-
-
-def ollama_chat(prompt: str, model: str | None = None) -> str | None:
-    """
-    Simple chat completion via Ollama HTTP API.
-    Returns the model's text response, or None if unavailable.
-    """
-    import requests
-    model = model or os.getenv("OLLAMA_CHAT_MODEL", "llama3.2")
-    url = "http://localhost:11434/api/generate"
-    try:
-        r = requests.post(
-            url,
-            json={"model": model, "prompt": prompt, "stream": False},
-            timeout=30,
-        )
-        r.raise_for_status()
-        return r.json().get("response", "").strip() or None
-    except Exception as e:
-        print(f"[LLM] Chat error: {e}")
-        return None
-
 
 def nim_chat(prompt: str) -> str | None:
     """
     Chat completion via NVIDIA NIM API (OpenAI-compatible).
     Uses NIM_API_KEY and NIM_MODEL from env.
+    Supports DeepSeek V3.2 with advanced reasoning.
     """
-    import requests
     api_key = os.getenv("NIM_API_KEY", "").strip()
     if not api_key:
         return None
-    model = os.getenv("NIM_MODEL", "meta/llama-3.3-70b-instruct")
-    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    model = os.getenv("NIM_MODEL", "deepseek-ai/deepseek-v3.2")
+    enable_reasoning = os.getenv("NIM_REASONING", "true").lower() == "true"
+    is_deepseek = "deepseek" in model.lower()
+    use_reasoning = enable_reasoning and is_deepseek
+
     try:
-        r = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 1024,
-            },
-            timeout=60,
+        from openai import OpenAI
+
+        client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=api_key,
         )
-        r.raise_for_status()
-        data = r.json()
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return content.strip() or None
-    except requests.exceptions.RequestException as e:
-        err = getattr(e, "response", None)
-        body = err.text if err else str(e)
-        print(f"[LLM] NIM chat error: {e} | {body[:200] if body else ''}")
-        return None
+
+        kwargs = dict(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=1 if use_reasoning else 0.3,
+            top_p=0.95 if use_reasoning else 0.7,
+            max_tokens=16384,
+            stream=use_reasoning,
+        )
+
+        if use_reasoning:
+            kwargs["extra_body"] = {"chat_template_kwargs": {"thinking": True}}
+
+        if use_reasoning:
+            stream = client.chat.completions.create(**kwargs)
+            content_parts = []
+            for chunk in stream:
+                if not getattr(chunk, "choices", None):
+                    continue
+                delta = chunk.choices[0].delta
+                if delta.content is not None:
+                    content_parts.append(delta.content)
+            content = "".join(content_parts).strip()
+            return content or None
+        else:
+            completion = client.chat.completions.create(**kwargs)
+            content = completion.choices[0].message.content if completion.choices else ""
+            return content.strip() or None
+    except ImportError:
+        # Fallback to requests if openai SDK not available
+        import requests
+        url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        try:
+            r = requests.post(
+                url,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 16384,
+                },
+                timeout=120,
+            )
+            r.raise_for_status()
+            data = r.json()
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return content.strip() or None
+        except Exception as e:
+            print(f"[LLM] NIM chat error: {e}")
+            return None
     except Exception as e:
         print(f"[LLM] NIM chat error: {e}")
         return None
+
+
+def _parse_json_from_response(raw: str):
+    """Try to extract and parse JSON from LLM response. Returns dict/list or None."""
+    if not raw or not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    # Strip markdown code block if present
+    if "```json" in text:
+        start = text.find("```json") + 7
+        end = text.find("```", start)
+        if end != -1:
+            text = text[start:end].strip()
+    elif "```" in text:
+        start = text.find("```") + 3
+        end = text.find("```", start)
+        if end != -1:
+            text = text[start:end].strip()
+    # Find first { or [ for JSON
+    for open_char, close_char in ("{[", "}]"):
+        i = text.find(open_char)
+        if i != -1:
+            depth = 0
+            for j in range(i, len(text)):
+                if text[j] in "{[":
+                    depth += 1
+                elif text[j] in "}]":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            return json.loads(text[i : j + 1])
+                        except json.JSONDecodeError:
+                                break
+            break
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
+def call_llm(prompt: str):
+    """
+    Single entry point for LLM completion (NIM/DeepSeek pipeline).
+    Used by team_lead, task_manager, and studio. Returns parsed JSON when
+    possible, else raw string. Returns: dict, list, or str; or None on failure.
+    """
+    raw = nim_chat(prompt)
+    if raw is None:
+        return None
+    parsed = _parse_json_from_response(raw)
+    if parsed is not None:
+        return parsed
+    return raw
+
+
+def call_ollama(prompt: str):
+    """Backward-compat name for call_llm. Use call_llm in new code."""
+    return call_llm(prompt)
+
+__all__ = ["nim_chat", "call_llm", "call_ollama"]

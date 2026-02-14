@@ -1,135 +1,173 @@
 """
-Engine State Machine — Phase-1 + Phase-4
+Engine state machine with explicit lifecycle governance.
 
-Controls agent execution order with strict state transitions.
-Agents can only run in their designated states.
-
-State Flow:
-  IDLE → PLANNING → APPROVED → EXECUTION → IDLE
-  (any) → AWAITING_HUMAN → (user action) → IDLE
-
-Rules (Hard Constraints):
-  - IDLE: Accept user request only
-  - PLANNING: PM + Architect only
-  - APPROVED: No agent calls (gate state)
-  - EXECUTION: Engineer only
-  - AWAITING_HUMAN: Autonomy frozen, waiting for user (Phase-4)
+Canonical states:
+IDLE -> PLANNING -> WAITING_FOR_APPROVAL -> EXECUTING -> REVIEWING -> QA
+then one of COMPLETED | PARTIAL_SUCCESS | FAILED | CANCELLED | TIMEOUT.
 """
+
+from __future__ import annotations
 
 from enum import Enum
 from typing import Set
 
 
 class EngineState(Enum):
-    """Engine execution states."""
+    """Engine execution states with backward-compatible aliases."""
+
     IDLE = "idle"
     PLANNING = "planning"
-    APPROVED = "approved"
-    EXECUTION = "execution"
-    AWAITING_HUMAN = "awaiting_human"  # Phase-4: Escalation state
+    WAITING_FOR_APPROVAL = "waiting_for_approval"
+    EXECUTING = "executing"
+    REVIEWING = "reviewing"
+    QA = "qa"
+    PARTIAL_SUCCESS = "partial_success"
+    AWAITING_HUMAN = "awaiting_human"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    TIMEOUT = "timeout"
+    COMPLETED = "completed"
+
+    # Backward-compat aliases
+    APPROVED = "waiting_for_approval"
+    EXECUTION = "executing"
 
 
-# Allowed agents per state
 ALLOWED_AGENTS: dict[EngineState, Set[str]] = {
-    EngineState.IDLE: set(),  # No agents allowed
-    EngineState.PLANNING: {"product_manager", "architect", "team_lead"},
-    EngineState.APPROVED: set(),  # Gate state - no agents
-    EngineState.EXECUTION: {"engineer", "qa", "devops", "qa_tester"},
-    EngineState.AWAITING_HUMAN: set(),  # Frozen - no agents
+    EngineState.IDLE: set(),
+    EngineState.PLANNING: {"product_manager", "architect", "team_lead", "planner"},
+    EngineState.WAITING_FOR_APPROVAL: set(),
+    EngineState.EXECUTING: {
+        "engineer",
+        "qa",
+        "devops",
+        "qa_tester",
+        "planner",
+        "db_schema",
+        "auth",
+        "coder",
+        "deployer",
+        "tester",
+    },
+    EngineState.REVIEWING: {"code_reviewer"},
+    EngineState.QA: {"qa", "qa_tester", "tester"},
+    EngineState.PARTIAL_SUCCESS: set(),
+    EngineState.AWAITING_HUMAN: set(),
+    EngineState.FAILED: set(),
+    EngineState.CANCELLED: set(),
+    EngineState.TIMEOUT: set(),
+    EngineState.COMPLETED: set(),
 }
 
-# Valid state transitions
+
 VALID_TRANSITIONS: dict[EngineState, Set[EngineState]] = {
-    EngineState.IDLE: {EngineState.PLANNING},
-    EngineState.PLANNING: {EngineState.APPROVED, EngineState.IDLE, EngineState.AWAITING_HUMAN},
-    EngineState.APPROVED: {EngineState.EXECUTION, EngineState.PLANNING, EngineState.AWAITING_HUMAN},
-    EngineState.EXECUTION: {EngineState.IDLE, EngineState.AWAITING_HUMAN},
-    EngineState.AWAITING_HUMAN: {EngineState.IDLE, EngineState.PLANNING},  # User can retry or abort
+    EngineState.IDLE: {
+        EngineState.PLANNING,
+        EngineState.FAILED,
+        EngineState.CANCELLED,
+        EngineState.TIMEOUT,
+    },
+    EngineState.PLANNING: {
+        EngineState.WAITING_FOR_APPROVAL,
+        EngineState.FAILED,
+        EngineState.CANCELLED,
+        EngineState.TIMEOUT,
+        EngineState.AWAITING_HUMAN,
+    },
+    EngineState.WAITING_FOR_APPROVAL: {
+        EngineState.PLANNING,
+        EngineState.EXECUTING,
+        EngineState.CANCELLED,
+        EngineState.TIMEOUT,
+        EngineState.FAILED,
+        EngineState.AWAITING_HUMAN,
+    },
+    EngineState.EXECUTING: {
+        EngineState.REVIEWING,
+        EngineState.QA,
+        EngineState.PARTIAL_SUCCESS,
+        EngineState.COMPLETED,
+        EngineState.FAILED,
+        EngineState.CANCELLED,
+        EngineState.TIMEOUT,
+        EngineState.AWAITING_HUMAN,
+    },
+    EngineState.REVIEWING: {
+        EngineState.EXECUTING,
+        EngineState.QA,
+        EngineState.PARTIAL_SUCCESS,
+        EngineState.COMPLETED,
+        EngineState.FAILED,
+        EngineState.CANCELLED,
+        EngineState.TIMEOUT,
+        EngineState.AWAITING_HUMAN,
+    },
+    EngineState.QA: {
+        EngineState.EXECUTING,
+        EngineState.PARTIAL_SUCCESS,
+        EngineState.COMPLETED,
+        EngineState.FAILED,
+        EngineState.CANCELLED,
+        EngineState.TIMEOUT,
+        EngineState.AWAITING_HUMAN,
+    },
+    EngineState.AWAITING_HUMAN: {
+        EngineState.IDLE,
+        EngineState.PLANNING,
+        EngineState.EXECUTING,
+        EngineState.CANCELLED,
+    },
+    EngineState.PARTIAL_SUCCESS: {EngineState.IDLE},
+    EngineState.FAILED: {EngineState.IDLE},
+    EngineState.CANCELLED: {EngineState.IDLE},
+    EngineState.TIMEOUT: {EngineState.IDLE},
+    EngineState.COMPLETED: {EngineState.IDLE},
 }
 
 
 class EngineStateError(Exception):
     """Raised when an invalid state transition or agent call is attempted."""
-    pass
 
 
 class EngineStateMachine:
-    """
-    Controls engine state and enforces agent execution rules.
-    
-    Usage:
-        engine = EngineStateMachine()
-        engine.transition(EngineState.PLANNING)
-        engine.validate_agent("product_manager")  # OK
-        engine.validate_agent("engineer")  # Raises EngineStateError
-    """
-    
+    """State machine guard for execution lifecycle."""
+
     def __init__(self):
         self._state = EngineState.IDLE
         self._history: list[EngineState] = [EngineState.IDLE]
-    
+
     @property
     def state(self) -> EngineState:
-        """Current engine state."""
         return self._state
-    
+
     @property
     def history(self) -> list[EngineState]:
-        """State transition history."""
         return self._history.copy()
-    
+
     def transition(self, new_state: EngineState) -> None:
-        """
-        Transition to a new state.
-        
-        Args:
-            new_state: Target state
-            
-        Raises:
-            EngineStateError: If transition is not valid
-        """
         if new_state not in VALID_TRANSITIONS[self._state]:
             raise EngineStateError(
-                f"Invalid transition: {self._state.value} → {new_state.value}. "
-                f"Valid targets: {[s.value for s in VALID_TRANSITIONS[self._state]]}"
+                f"Invalid transition: {self._state.value} -> {new_state.value}. "
+                f"Valid targets: {[state.value for state in VALID_TRANSITIONS[self._state]]}"
             )
-        
+
         self._state = new_state
         self._history.append(new_state)
-    
+
     def validate_agent(self, agent_name: str) -> None:
-        """
-        Check if an agent is allowed to run in the current state.
-        
-        Args:
-            agent_name: Name of the agent attempting to run
-            
-        Raises:
-            EngineStateError: If agent is not allowed in current state
-        """
         allowed = ALLOWED_AGENTS[self._state]
         if agent_name not in allowed:
             raise EngineStateError(
                 f"Agent '{agent_name}' cannot run in state '{self._state.value}'. "
                 f"Allowed agents: {list(allowed) or 'none'}"
             )
-    
+
     def can_agent_run(self, agent_name: str) -> bool:
-        """
-        Check if an agent can run (non-throwing version).
-        
-        Args:
-            agent_name: Name of the agent
-            
-        Returns:
-            True if agent is allowed in current state
-        """
         return agent_name in ALLOWED_AGENTS[self._state]
-    
+
     def reset(self) -> None:
-        """Reset engine to IDLE state."""
         self._state = EngineState.IDLE
         self._history = [EngineState.IDLE]
-    
+
     def __repr__(self) -> str:
         return f"EngineStateMachine(state={self._state.value})"

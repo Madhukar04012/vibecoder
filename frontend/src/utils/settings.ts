@@ -63,6 +63,7 @@ export function getLanguageDisplayName(lang: string): string {
 export function getModelDisplayName(model: string): string {
   const models: Record<string, string> = {
     auto: 'Auto-Select',
+    'minimax-m2.1': 'MiniMax M2.1',
     'gpt-4': 'GPT-4',
     'gpt-3.5': 'GPT-3.5 Turbo',
     claude: 'Claude',

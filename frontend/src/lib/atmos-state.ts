@@ -28,12 +28,12 @@ export type AtmosPhase =
 // Valid transitions
 const VALID_TRANSITIONS: Record<AtmosPhase, AtmosPhase[]> = {
     idle: ['interpreting'],
-    interpreting: ['generating', 'error_fixing', 'idle'],
-    generating: ['building', 'error_fixing', 'idle'],
-    building: ['running', 'error_fixing', 'idle'],
+    interpreting: ['interpreting', 'generating', 'building', 'error_fixing', 'idle'],  // multiple agents can stay in interpreting
+    generating: ['generating', 'building', 'running', 'live', 'error_fixing', 'idle'],  // live/running: skip build for static projects
+    building: ['building', 'running', 'live', 'error_fixing', 'idle'],               // live: skip dev server for static builds
     running: ['live', 'error_fixing', 'idle'],
     live: ['interpreting', 'idle'],   // user sends new intent
-    error_fixing: ['building', 'generating', 'idle'],  // retry or give up
+    error_fixing: ['building', 'running', 'generating', 'live', 'idle'],  // retry or give up
 };
 
 // ─── Phase Display ──────────────────────────────────────────────────────────
@@ -167,14 +167,15 @@ export const useAtmosStore = create<AtmosState>((set, get) => ({
 
 // ─── SSE Runner ─────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '' : 'http://127.0.0.1:8000');
 
 /**
- * Send user intent to ATMOS backend and process SSE stream.
+ * Send user intent to the multi-agent backend and process SSE stream.
  * This is the ONLY entry point for user actions.
  * 
- * The backend does everything: interpret, generate files, install, build, run.
- * We just listen to events and update the UI.
+ * Uses the Atoms Engine which runs a full multi-agent SDLC pipeline:
+ * TeamLead → PM → Architect → Engineer → QA → DevOps
+ * with inter-agent discussions visible in the chat.
  */
 export async function runAtmosIntent(intent: string): Promise<void> {
     const store = useAtmosStore.getState();
@@ -186,10 +187,10 @@ export async function runAtmosIntent(intent: string): Promise<void> {
     store.setAbortController(ac);
 
     try {
-        const response = await fetch(`${API_BASE}/atmos/run`, {
+        const response = await fetch(`${API_BASE}/api/atoms/stream`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ intent }),
+            body: JSON.stringify({ prompt: intent, files: {}, mode: 'standard' }),
             signal: ac.signal,
         });
 
@@ -236,11 +237,25 @@ export async function runAtmosIntent(intent: string): Promise<void> {
 
 // ─── Event Handler ──────────────────────────────────────────────────────────
 
+// Map atoms_engine phases to atmos phases based on agent progress
+function agentToPhase(agent: string): AtmosPhase | null {
+    switch (agent) {
+        case 'team_lead': return 'interpreting';
+        case 'pm': return 'interpreting';
+        case 'architect': return 'interpreting';
+        case 'engineer': return 'generating';
+        case 'qa': return 'generating';
+        case 'devops': return 'building';
+        default: return null;
+    }
+}
+
 function handleAtmosEvent(event: any) {
     const store = useAtmosStore.getState();
     const { type, ...payload } = event;
 
     switch (type) {
+        // ── Phase transitions ────────────────────────────────────
         case 'phase_change':
             store.transition(payload.phase);
             break;
@@ -249,11 +264,134 @@ function handleAtmosEvent(event: any) {
             store.setStatus(payload.message);
             break;
 
+        // ── Agent lifecycle (from atoms_engine) ──────────────────
+        case 'agent_start': {
+            const agentPhase = agentToPhase(payload.agent);
+            if (agentPhase) {
+                const current = store.phase;
+                const valid = ['idle', 'interpreting', 'generating', 'building', 'running', 'error_fixing', 'live'];
+                if (valid.includes(current)) {
+                    try { store.transition(agentPhase); } catch { /* skip invalid transition */ }
+                }
+            }
+            EventBus.emit('AI_AGENT_START', {
+                agent: payload.agent,
+                name: payload.name,
+                icon: payload.icon,
+                description: payload.description,
+            }, 'atoms');
+
+            // Emit run_started event card on first agent (team_lead)
+            if (payload.agent === 'team_lead') {
+                EventBus.emit('AI_MESSAGE', {
+                    content: 'run_started',
+                    role: 'assistant',
+                    agentName: 'AI Team',
+                    agentIcon: 'brain',
+                    messageType: 'event_card',
+                    eventType: 'run_started',
+                }, 'atoms');
+                EventBus.emit('TERMINAL_OUTPUT', { text: 'run_started', type: 'stdout' }, 'atoms');
+                // Emit budget_configured right after
+                EventBus.emit('AI_MESSAGE', {
+                    content: 'budget_configured',
+                    role: 'assistant',
+                    agentName: 'AI Team',
+                    agentIcon: 'brain',
+                    messageType: 'event_card',
+                    eventType: 'budget_configured',
+                }, 'atoms');
+                EventBus.emit('TERMINAL_OUTPUT', { text: 'budget_configured', type: 'stdout' }, 'atoms');
+            }
+
+            // Show agent status in chat as event card
+            EventBus.emit('AI_MESSAGE', {
+                content: payload.description || `${payload.name} is working...`,
+                role: 'assistant',
+                agentName: payload.name,
+                agentIcon: payload.icon,
+                messageType: 'agent_status',
+                eventType: `${payload.agent}_started`,
+            }, 'atoms');
+            // Route to terminal log
+            EventBus.emit('TERMINAL_OUTPUT', {
+                text: `${payload.name || payload.agent}_started`,
+                type: 'stdout',
+            }, 'atoms');
+            break;
+        }
+
+        case 'agent_end':
+            EventBus.emit('AI_AGENT_END', {
+                agent: payload.agent,
+                result: payload.result,
+            }, 'atoms');
+            if (payload.result) {
+                EventBus.emit('AI_MESSAGE', {
+                    content: payload.result,
+                    role: 'assistant',
+                    agentName: payload.name || payload.agent,
+                    agentIcon: payload.icon,
+                    messageType: 'agent_result',
+                }, 'atoms');
+            }
+            // Route to terminal log
+            EventBus.emit('TERMINAL_OUTPUT', {
+                text: `${payload.name || payload.agent}_completed`,
+                type: 'stdout',
+            }, 'atoms');
+            break;
+
+        // ── Agent-to-agent discussions ───────────────────────────
+        case 'discussion':
+            EventBus.emit('AI_DISCUSSION', {
+                from: payload.from,
+                to: payload.to,
+                icon: payload.icon,
+                message: payload.message,
+            }, 'atoms');
+            break;
+
+        // ── File events (atoms_engine uses file_start/delta/end) ─
+        case 'file_start':
+            EventBus.emit('AI_FILE_WRITING', {
+                path: payload.path,
+            }, 'atoms');
+            break;
+
+        case 'file_delta':
+            EventBus.emit('AI_FILE_DELTA', {
+                path: payload.path,
+                delta: payload.delta,
+            }, 'atoms');
+            break;
+
+        case 'file_end':
+            // atoms_engine file_end doesn't include content, flush live writer
+            EventBus.emit('FILE_CREATED', {
+                path: payload.path,
+                content: '', // content was streamed via deltas
+            }, 'atoms');
+            break;
+
+        // ── File events (atmos.py style) ─────────────────────────
         case 'file_created':
-            // Push to IDE store via event bus
             EventBus.emit('FILE_CREATED', {
                 path: payload.path,
                 content: payload.content,
+            }, 'atmos');
+            break;
+
+        case 'file_token':
+            EventBus.emit('AI_FILE_DELTA', {
+                path: payload.path,
+                delta: payload.token,
+            }, 'atmos');
+            break;
+
+        case 'file_writing':
+            EventBus.emit('AI_FILE_WRITING', {
+                path: payload.path,
             }, 'atmos');
             break;
 
@@ -264,36 +402,128 @@ function handleAtmosEvent(event: any) {
             }, 'atmos');
             break;
 
+        // ── Preview ──────────────────────────────────────────────
         case 'preview_ready':
             store.setPreviewUrl(payload.url);
             store.transition('live');
             break;
 
+        // ── Errors ───────────────────────────────────────────────
         case 'error':
             store.setError(payload.message);
-            EventBus.emit('AI_ERROR', { message: payload.message }, 'atmos');
+            EventBus.emit('AI_ERROR', { message: payload.message }, 'atoms');
+            EventBus.emit('TERMINAL_OUTPUT', {
+                text: `ERROR: ${payload.message}`,
+                type: 'stderr',
+            }, 'atoms');
             if (payload.fixing) {
                 store.transition('error_fixing');
             }
             break;
 
+        // ── Chat messages (both engines) ─────────────────────────
         case 'chat_message':
             EventBus.emit('AI_MESSAGE', {
                 content: payload.message,
                 role: 'assistant',
-            }, 'atmos');
+            }, 'atoms');
+            break;
+
+        case 'message':
+            EventBus.emit('AI_MESSAGE', {
+                content: payload.content,
+                role: 'assistant',
+            }, 'atoms');
+            // Route build/deploy messages to terminal panel (backend may send type: 'stderr' | 'stdout')
+            if (payload.content) {
+                EventBus.emit('TERMINAL_OUTPUT', {
+                    text: payload.content,
+                    type: (payload.type === 'stderr' ? 'stderr' : 'stdout') as 'stdout' | 'stderr',
+                }, 'atoms');
+            }
             break;
 
         case 'chat_token':
-            // Streaming token for real-time chat typing effect
             EventBus.emit('AI_MESSAGE_TOKEN', {
                 token: payload.token,
-            }, 'atmos');
+            }, 'atoms');
             break;
 
+        case 'message_token':
+            EventBus.emit('AI_MESSAGE_TOKEN', {
+                token: payload.token,
+            }, 'atoms');
+            break;
+
+        // ── Blackboard updates → Event cards ─────────────────────
+        case 'blackboard_update': {
+            const field = payload.field;
+
+            // Skip noisy internal state transitions
+            if (field === 'state') break;
+
+            const eventLabels: Record<string, string> = {
+                project_type: 'project_analyzed',
+                detected_stack: 'stack_detected',
+                prd: 'execution_plan',
+                architecture: 'architecture_designed',
+                file_plan: 'file_plan_ready',
+                qa_result: 'qa_complete',
+            };
+            const label = eventLabels[field] || field;
+
+            // Build readable content from the structured data
+            let content = label;
+            const val = payload.value;
+            if (field === 'prd' && val) {
+                const title = val.title || val.name || '';
+                const features = val.features || [];
+                const featureList = features.slice(0, 5).map((f: any) => typeof f === 'string' ? f : f.name || f.title || '').filter(Boolean).join(', ');
+                content = title ? `${title}` : 'Execution plan ready';
+                if (featureList) content += `\nFeatures: ${featureList}`;
+            } else if (field === 'architecture' && val) {
+                const dirStructure = val.directory_structure;
+                const fileCount = dirStructure ? Object.keys(dirStructure).length : (val.files ? val.files.length : 0);
+                content = `Architecture designed — ${fileCount} components planned`;
+            } else if (field === 'detected_stack' && val) {
+                const framework = val.framework || val.name || '';
+                const lang = val.language || '';
+                content = `Stack detected: ${[framework, lang].filter(Boolean).join(' / ') || 'auto-detected'}`;
+            } else if (field === 'qa_result' && val) {
+                const score = val.overall_score || val.score;
+                const verdict = val.verdict || '';
+                content = score ? `QA Score: ${score}/100${verdict ? ` — ${verdict}` : ''}` : 'QA review complete';
+            } else if (field === 'project_type' && val) {
+                content = `Project type: ${typeof val === 'string' ? val : JSON.stringify(val)}`;
+            }
+
+            EventBus.emit('AI_MESSAGE', {
+                content,
+                role: 'assistant',
+                agentName: 'AI Team',
+                agentIcon: 'brain',
+                messageType: 'event_card',
+                eventType: label,
+                eventData: val,
+            }, 'atoms');
+            // Route to terminal
+            EventBus.emit('TERMINAL_OUTPUT', {
+                text: label,
+                type: 'stdout',
+            }, 'atoms');
+            break;
+        }
+
+        // ── Race mode events ─────────────────────────────────────
+        case 'race_start':
+        case 'race_progress':
+        case 'race_result':
+            // Could be visualized later
+            break;
+
+        // ── Done ─────────────────────────────────────────────────
         case 'done':
-            EventBus.emit('ATMOS_DONE', {}, 'atmos');
-            // If not already live, go idle
+            EventBus.emit('ATMOS_DONE', {}, 'atoms');
             if (store.phase !== 'live') {
                 store.transition('idle');
             }

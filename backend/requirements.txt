@@ -10,6 +10,7 @@ requests
 psycopg2-binary
 alembic
 pytest
+openai>=1.0.0
 
 # Phase-1: Agent Observability & Intelligence
 faiss-cpu>=1.7.4

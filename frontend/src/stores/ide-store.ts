@@ -42,12 +42,22 @@ export interface ChatFileItem {
   status: ChatFileStatus;
 }
 
+export type ChatMessageType = 'chat' | 'discussion' | 'agent_status' | 'agent_result' | 'event_card';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   isStreaming?: boolean;
   files?: ChatFileItem[];
+  // Multi-agent fields
+  agentName?: string;       // "Team Leader", "Product Manager", etc.
+  agentIcon?: string;       // "crown", "clipboard", "layers", "code", "shield", "rocket"
+  toAgent?: string;         // target agent for discussions
+  messageType?: ChatMessageType;
+  // Event card fields (Atmos-style pipeline events)
+  eventType?: string;       // "run_started", "budget_configured", "execution_plan", etc.
+  eventData?: Record<string, any>; // structured payload for event cards
 }
 
 // ─── File Status ──────────────────────────────────────────────────────────
@@ -151,20 +161,24 @@ export const useIDEStore = create<IDEState>((set, get) => ({
   fileStatuses: {},
 
   openFile: (path) => {
-    const { openFiles, fileContents, markOpened, setActiveContext } = get();
-    if (!openFiles.includes(path)) {
-      set({
-        openFiles: [...openFiles, path],
-        fileContents: {
-          ...fileContents,
-          [path]: fileContents[path] ?? '',
-        },
-      });
-    }
-    set({ activeFile: path });
-    // Workspace awareness signals
-    markOpened(path);
-    setActiveContext([path]);
+    const { openFiles, fileContents } = get();
+    // Batch all state updates into a single set() to avoid transient inconsistencies
+    // Prepend new files at the start so the active file is always the first tab
+    set((s) => ({
+      openFiles: s.openFiles.includes(path)
+        ? [path, ...s.openFiles.filter((f) => f !== path)]
+        : [path, ...s.openFiles],
+      fileContents: {
+        ...s.fileContents,
+        [path]: s.fileContents[path] ?? '',
+      },
+      activeFile: path,
+      recentlyOpenedFiles: [
+        path,
+        ...s.recentlyOpenedFiles.filter((p) => p !== path),
+      ].slice(0, 10),
+      activeContextFiles: [path],
+    }));
   },
 
   closeFile: (path) => {
@@ -332,20 +346,26 @@ export const useIDEStore = create<IDEState>((set, get) => ({
 
   // ─── File operations from chat ──────────────────────────────────────────
   createFile: (path, content, openAfter = false) =>
-    set((s) => ({
-      fileContents: { ...s.fileContents, [path]: content },
-      fileStatuses: {
-        ...s.fileStatuses,
-        [path]: {
-          ...s.fileStatuses[path],
-          isNew: true,
-          isAIGenerated: true,
-          isModified: false,
+    set((s) => {
+      // Prepend the file at the start of tabs so the AI-written file is always first
+      const newOpenFiles = s.openFiles.includes(path)
+        ? (openAfter ? [path, ...s.openFiles.filter((f) => f !== path)] : s.openFiles)
+        : [path, ...s.openFiles];
+      return {
+        fileContents: { ...s.fileContents, [path]: content },
+        fileStatuses: {
+          ...s.fileStatuses,
+          [path]: {
+            ...s.fileStatuses[path],
+            isNew: true,
+            isAIGenerated: true,
+            isModified: false,
+          },
         },
-      },
-      openFiles: s.openFiles.includes(path) ? s.openFiles : [...s.openFiles, path],
-      activeFile: openAfter ? path : s.activeFile,
-    })),
+        openFiles: newOpenFiles,
+        activeFile: openAfter ? path : s.activeFile,
+      };
+    }),
 
   appendToFile: (path, delta) =>
     set((s) => ({
@@ -427,6 +447,19 @@ export function restoreIDEState(): void {
 
     const saved = JSON.parse(raw) as PersistedIDE;
     if (!Array.isArray(saved.openFiles)) return;
+
+    // Only restore tabs if there are file contents to show.
+    // Without content, tabs would show as blank (ghost tabs).
+    const state = useIDEStore.getState();
+    const hasContent = saved.openFiles.some(
+      (f) => state.fileContents[f] && state.fileContents[f].length > 0
+    );
+
+    if (!hasContent) {
+      // Clear stale persistence — no point keeping empty tabs
+      localStorage.removeItem(IDE_PERSIST_KEY);
+      return;
+    }
 
     useIDEStore.setState({
       openFiles: saved.openFiles,

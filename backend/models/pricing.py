@@ -47,12 +47,9 @@ MODEL_PRICING: Dict[str, ModelPricing] = {
     "meta/llama-3.3-70b-instruct": ModelPricing(0.0008, 0.0008, "nvidia"),
     "meta/llama-3.1-405b-instruct": ModelPricing(0.005, 0.005, "nvidia"),
     
-    # Ollama (local, free)
-    "llama3.2": ModelPricing(0.0, 0.0, "ollama"),
-    "llama3.1": ModelPricing(0.0, 0.0, "ollama"),
-    "codellama": ModelPricing(0.0, 0.0, "ollama"),
-    "mistral": ModelPricing(0.0, 0.0, "ollama"),
-    "deepseek-coder": ModelPricing(0.0, 0.0, "ollama"),
+    # NIM/DeepSeek (pipeline default; pricing may vary by tier)
+    "deepseek-ai/deepseek-v3.2": ModelPricing(0.0, 0.0, "nvidia"),
+    "deepseek-coder": ModelPricing(0.0, 0.0, "nvidia"),
 }
 
 # Default model if unknown
@@ -98,6 +95,6 @@ def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
 
 
 def is_free_model(model: str) -> bool:
-    """Check if a model is free (Ollama local models)."""
+    """Check if a model is free (e.g. NIM tier or local)."""
     pricing = get_model_pricing(model)
     return pricing.input_cost_per_1k == 0 and pricing.output_cost_per_1k == 0
