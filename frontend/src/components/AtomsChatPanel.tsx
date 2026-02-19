@@ -12,7 +12,7 @@
 
 import { useState, useCallback, useRef, useEffect, type KeyboardEvent } from "react";
 import {
-  Send, Loader2,
+  Loader2,
   RotateCcw, User,
   Crown, ClipboardList, Layers, Code2, Shield, Rocket,
   Brain, ArrowRight, CheckCircle2, Activity,
@@ -751,7 +751,7 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
               <p className="text-[14px] mb-8 text-center max-w-[360px] leading-relaxed" style={{ color: 'var(--ide-text-muted)' }}>
                 Your AI team will collaborate in real-time to bring your vision to life.
               </p>
-              
+
               {/* Agent Pills */}
               <div className="flex flex-wrap justify-center gap-2 mb-8">
                 {[
@@ -769,7 +769,7 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
                 ))}
               </div>
             </div>
-            
+
             {/* Example Prompts */}
             <div className="pb-6">
               <p className="text-[11px] font-semibold uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--ide-text-muted)' }}>
@@ -861,8 +861,7 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 shrink-0 relative" style={{ background: 'var(--ide-chat-input-bg)', borderTop: '1px solid var(--ide-border)', zIndex: 20 }}>
-
+      <div className="p-4 border-t bg-background shrink-0" style={{ borderColor: 'var(--ide-border)' }}>
         {/* Attachments Display */}
         {attachments.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">
@@ -871,9 +870,9 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
                 key={attachment.id}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
                 style={{
-                  background: 'var(--ide-surface)',
-                  borderColor: 'var(--ide-border)',
-                  color: 'var(--ide-text-secondary)'
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  color: 'rgba(255, 255, 255, 0.8)'
                 }}
               >
                 {attachment.type === 'image' ? (
@@ -896,25 +895,9 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
           </div>
         )}
 
-        <div
-          className="relative rounded-2xl border overflow-hidden transition-all focus-within:border-blue-500/50 focus-within:shadow-lg focus-within:shadow-blue-500/10"
-          style={{
-            background: 'var(--ide-surface)',
-            borderColor: 'var(--ide-border)',
-          }}
-        >
-          <div className="flex items-end px-3 py-2">
+        <div className="flex flex-col gap-2 p-3 rounded-xl border border-input bg-zinc-900/50 focus-within:border-primary transition-colors">
+          <div className="flex items-start gap-2">
             {/* Attachment Button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 rounded-lg transition-colors shrink-0 mb-0.5"
-              style={{ color: 'var(--ide-text-muted)' }}
-              title="Add attachment"
-            >
-              <Plus size={18} />
-            </button>
-
-            {/* Hidden File Input */}
             <input
               ref={fileInputRef}
               type="file"
@@ -923,6 +906,13 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
               className="hidden"
               accept=".txt,.py,.js,.ts,.tsx,.jsx,.md,.json,.yaml,.yml,.html,.css,.scss,.png,.jpg,.jpeg,.gif,.svg,.pdf"
             />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 transition-colors"
+              title="Add context (files, images)"
+            >
+              <Plus size={16} />
+            </button>
 
             <textarea
               ref={textareaRef}
@@ -930,19 +920,13 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              placeholder="What do you want to build?"
+              className="w-full bg-transparent border-none outline-none resize-none text-[14px] leading-relaxed py-1 no-scrollbar"
               disabled={isStreaming}
-              className="flex-1 bg-transparent text-[14px] outline-none resize-none px-2 py-2 leading-relaxed disabled:opacity-50"
-              style={{
-                color: 'var(--ide-text)',
-                caretColor: 'var(--ide-accent, #3b82f6)',
-                minHeight: '40px',
-                maxHeight: '150px',
-              }}
-              placeholder="Describe what you want to build..."
             />
 
             {/* Send/Stop Button */}
-            <div className="shrink-0 mb-0.5">
+            <div className="shrink-0 mt-1">
               {isStreaming ? (
                 <button
                   onClick={handleStop}
@@ -950,34 +934,31 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
                   style={{ color: '#ef4444' }}
                 >
                   <RotateCcw size={16} />
-                  <span>Stop</span>
                 </button>
               ) : (
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() && attachments.length === 0}
+                  disabled={!input.trim() || isStreaming}
                   className={cn(
-                    "p-2.5 rounded-xl flex items-center justify-center transition-all duration-200",
-                    "disabled:opacity-30 disabled:cursor-not-allowed",
-                    input.trim() || attachments.length > 0
-                      ? "bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/25"
-                      : "bg-var(--ide-surface-hover)"
+                    "p-1.5 rounded-lg transition-all",
+                    input.trim() && !isStreaming
+                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                      : "bg-zinc-800 text-zinc-500 opacity-50 cursor-not-allowed"
                   )}
-                  style={{ 
-                    color: input.trim() || attachments.length > 0 ? 'white' : 'var(--ide-text-muted)'
-                  }}
-                  title="Send message"
                 >
-                  <Send size={16} />
+                  <ArrowRight size={16} />
                 </button>
               )}
             </div>
           </div>
-          
+
           {/* Keyboard hint */}
-          <div className="px-4 py-1.5 flex items-center justify-between text-[11px]" style={{ borderTop: '1px solid var(--ide-border-subtle)', color: 'var(--ide-text-muted)' }}>
-            <span>Press <kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: 'var(--ide-surface-hover)' }}>Enter</kbd> to send</span>
-            <span><kbd className="px-1.5 py-0.5 rounded font-mono text-[10px]" style={{ background: 'var(--ide-surface-hover)' }}>Shift+Enter</kbd> for new line</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700/50 text-[10px] text-zinc-400">
+              <span>Enter to send</span>
+              <span className="w-1 h-1 rounded-full bg-zinc-600" />
+              <span>Shift+Enter new line</span>
+            </div>
           </div>
         </div>
       </div>

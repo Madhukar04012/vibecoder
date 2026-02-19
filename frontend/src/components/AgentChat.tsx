@@ -7,7 +7,6 @@ import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { AgentOrchestrator, type Message } from "@/core/orchestrator";
 import { AGENTS } from "@/agents/definitions";
-import { useIDEStore } from "@/stores/ide-store";
 
 interface PendingApproval {
   plan: string;
@@ -20,7 +19,6 @@ export function AgentChat() {
   const [isRunning, setIsRunning] = useState(false);
   const [stepCount, setStepCount] = useState(0);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
-  const agentSteps = useIDEStore((s) => s.agentSteps);
   const orchestratorRef = useRef<AgentOrchestrator | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -113,11 +111,10 @@ export function AgentChat() {
               </div>
             )}
             <div
-              className={`rounded-lg p-3 text-sm leading-relaxed ${
-                msg.agent === "user"
-                  ? "ml-auto max-w-[80%]"
-                  : "max-w-[95%]"
-              }`}
+              className={`rounded-lg p-3 text-sm leading-relaxed ${msg.agent === "user"
+                ? "ml-auto max-w-[80%]"
+                : "max-w-[95%]"
+                }`}
               style={{
                 background: msg.agent === "user" ? "var(--ide-surface-hover)" : "var(--ide-surface)",
               }}

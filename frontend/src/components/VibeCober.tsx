@@ -66,6 +66,44 @@ const VibeCober: React.FC = () => {
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [buildProgress, setBuildProgress] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isChatFocused, setIsChatFocused] = useState(false);
+  const [cookFontIndex, setCookFontIndex] = useState(0);
+
+  // 7 fonts + colors for the cycling "cook" word
+  const cookStyles = [
+    { fontFamily: "'Playfair Display', serif", color: '#818cf8' },   // indigo-400
+    { fontFamily: "'Pacifico', cursive", color: '#a78bfa' },          // violet-400
+    { fontFamily: "'Space Mono', monospace", color: '#38bdf8' },      // sky-400
+    { fontFamily: "'Permanent Marker', cursive", color: '#f472b6' },  // pink-400
+    { fontFamily: "'Satisfy', cursive", color: '#34d399' },           // emerald-400
+    { fontFamily: "'Righteous', sans-serif", color: '#fb923c' },      // orange-400
+    { fontFamily: "'Orbitron', sans-serif", color: '#c084fc' },       // purple-400
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCookFontIndex(prev => (prev + 1) % 7);
+    }, 800);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Typing placeholder animation (moved from renderLandingPage to top level to obey React hooks rules)
+  const [placeholder, setPlaceholder] = useState('');
+  const fullPlaceholder = 'Make me a SaaS app with authentication and payments...';
+
+  useEffect(() => {
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index <= fullPlaceholder.length) {
+        setPlaceholder(fullPlaceholder.slice(0, index));
+        index++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleGenerate = async () => {
     if (!idea.trim()) return;
@@ -279,24 +317,6 @@ const VibeCober: React.FC = () => {
   );
 
   const renderLandingPage = () => {
-    const [placeholder, setPlaceholder] = useState('');
-    const fullPlaceholder =
-      'Make me a SaaS app with authentication and payments...';
-
-    useEffect(() => {
-      let index = 0;
-      const interval = setInterval(() => {
-        if (index <= fullPlaceholder.length) {
-          setPlaceholder(fullPlaceholder.slice(0, index));
-          index++;
-        } else {
-          clearInterval(interval);
-        }
-      }, 50);
-
-      return () => clearInterval(interval);
-    }, []);
-
     return (
       <div className="relative min-h-screen overflow-hidden">
         <DottedSurface className="opacity-90" />
@@ -338,7 +358,18 @@ const VibeCober: React.FC = () => {
                   theme === 'dark' ? 'text-muted-foreground' : 'text-[#555555]'
                 )}
               >
-                Turn ideas into real, runnable code.
+                Let's{' '}
+                <span
+                  style={{
+                    fontFamily: cookStyles[cookFontIndex].fontFamily,
+                    color: cookStyles[cookFontIndex].color,
+                    transition: 'all 0.4s ease-in-out',
+                    display: 'inline-block',
+                  }}
+                >
+                  cook
+                </span>
+                {' '}some code.
               </p>
             </motion.div>
 
@@ -346,12 +377,69 @@ const VibeCober: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="relative max-w-2xl mx-auto px-2 sm:px-0"
+              className="relative mx-auto px-2 sm:px-0"
+              style={{
+                maxWidth: isChatFocused ? '48rem' : '42rem',
+                transition: 'max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
             >
-              <div className="relative">
+              {/* Animated glow behind glass */}
+              <div
+                className="absolute -inset-3 sm:-inset-5 rounded-[2rem] pointer-events-none"
+                style={{
+                  background: theme === 'dark'
+                    ? 'radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.08) 40%, transparent 70%)'
+                    : 'radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.05) 40%, transparent 70%)',
+                  filter: 'blur(25px)',
+                  opacity: isChatFocused ? 1 : 0.4,
+                  transform: isChatFocused ? 'scale(1.08)' : 'scale(1)',
+                  transition: 'opacity 0.5s ease, transform 0.5s ease',
+                }}
+              />
+
+              {/* Glass container */}
+              <div
+                className="relative rounded-2xl overflow-hidden cursor-text"
+                onClick={() => {
+                  const ta = document.querySelector<HTMLTextAreaElement>('#landing-chat-textarea');
+                  ta?.focus();
+                }}
+                style={{
+                  background: theme === 'dark'
+                    ? isChatFocused ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.035)'
+                    : isChatFocused ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.55)',
+                  backdropFilter: isChatFocused ? 'blur(32px) saturate(1.4)' : 'blur(20px) saturate(1.1)',
+                  WebkitBackdropFilter: isChatFocused ? 'blur(32px) saturate(1.4)' : 'blur(20px) saturate(1.1)',
+                  border: theme === 'dark'
+                    ? isChatFocused ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(255,255,255,0.07)'
+                    : isChatFocused ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(0,0,0,0.06)',
+                  boxShadow: isChatFocused
+                    ? theme === 'dark'
+                      ? '0 0 0 1px rgba(99,102,241,0.2), 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)'
+                      : '0 0 0 1px rgba(99,102,241,0.15), 0 16px 48px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.9)'
+                    : theme === 'dark'
+                      ? '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)'
+                      : '0 8px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.7)',
+                  transform: isChatFocused ? 'scale(1.02)' : 'scale(1)',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+              >
+                {/* Inner top shine */}
+                <div
+                  className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+                  style={{
+                    background: theme === 'dark'
+                      ? 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)'
+                      : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
+                  }}
+                />
+
                 <Textarea
+                  id="landing-chat-textarea"
                   value={idea}
                   onChange={(e) => setIdea(e.target.value)}
+                  onFocus={() => setIsChatFocused(true)}
+                  onBlur={() => setIsChatFocused(false)}
                   onKeyDown={(e) => {
                     if (
                       e.key === 'Enter' &&
@@ -364,30 +452,52 @@ const VibeCober: React.FC = () => {
                   }}
                   placeholder={placeholder}
                   className={cn(
-                    'min-h-[100px] sm:min-h-[120px] text-base sm:text-lg bg-background/80 backdrop-blur-xl border-border focus:border-primary transition-all resize-none pr-12 sm:pr-14 py-4 touch-manipulation',
-                    theme === 'light' && 'placeholder:text-[#AAAAAA] bg-white border-[#e5e5e5]'
+                    'border-none bg-transparent focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none touch-manipulation leading-relaxed',
+                    'text-base sm:text-lg px-5 sm:px-6 pt-5 sm:pt-6 pb-3',
+                    'transition-all duration-400',
+                    isChatFocused ? 'min-h-[140px] sm:min-h-[180px]' : 'min-h-[90px] sm:min-h-[110px]',
+                    theme === 'dark'
+                      ? 'placeholder:text-white/20 text-white/90'
+                      : 'placeholder:text-[#AAAAAA] text-[#333333]'
                   )}
                 />
-                <Button
-                  onClick={handleGenerate}
-                  disabled={!idea.trim()}
-                  size="icon"
-                  className={cn(
-                    'absolute bottom-3 right-3 sm:bottom-4 sm:right-4 rounded-full h-10 w-10 sm:h-11 sm:w-11 touch-manipulation',
-                    theme === 'light' && 'bg-[#888888] text-white hover:bg-[#777777]'
-                  )}
+
+                {/* Bottom bar */}
+                <div
+                  className="flex items-center justify-between px-4 sm:px-5 py-3"
+                  style={{
+                    borderTop: theme === 'dark'
+                      ? '1px solid rgba(255,255,255,0.06)'
+                      : '1px solid rgba(0,0,0,0.05)',
+                  }}
                 >
-                  <ArrowRight className="w-5 h-5" />
-                </Button>
+                  <p
+                    className={cn(
+                      'text-xs font-normal transition-opacity duration-300',
+                      isChatFocused ? 'opacity-60' : 'opacity-40',
+                      theme === 'dark' ? 'text-white/50' : 'text-[#999999]'
+                    )}
+                  >
+                    <kbd className="font-mono text-[10px]">Enter</kbd> to generate · <kbd className="font-mono text-[10px]">Shift+Enter</kbd> new line
+                  </p>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={!idea.trim()}
+                    className={cn(
+                      'rounded-xl h-9 px-4 sm:h-10 sm:px-5 text-sm font-medium transition-all duration-300 touch-manipulation',
+                      idea.trim()
+                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40'
+                        : theme === 'dark'
+                          ? 'bg-white/5 text-white/20 border border-white/5'
+                          : 'bg-black/5 text-black/20 border border-black/5',
+                      'disabled:cursor-not-allowed'
+                    )}
+                  >
+                    Generate
+                    <ArrowRight className="w-4 h-4 ml-1.5" />
+                  </Button>
+                </div>
               </div>
-              <p
-                className={cn(
-                  'text-sm font-normal mt-3',
-                  theme === 'dark' ? 'text-muted-foreground' : 'text-[#888888]'
-                )}
-              >
-                Press Enter to generate
-              </p>
             </motion.div>
           </div>
         </section>
