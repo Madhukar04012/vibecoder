@@ -1,0 +1,22 @@
+{
+  "2026-02-14": {
+    "local-cli": {
+      "tier": "enterprise",
+      "spent_usd": 0.0
+    },
+    "anonymous-api": {
+      "tier": "enterprise",
+      "spent_usd": 0.0
+    }
+  },
+  "2026-02-15": {
+    "local-cli": {
+      "tier": "enterprise",
+      "spent_usd": 0.0
+    },
+    "atoms-stream": {
+      "tier": "free",
+      "spent_usd": 0.039
+    }
+  }
+}

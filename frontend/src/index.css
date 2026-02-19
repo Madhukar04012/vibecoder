@@ -1,0 +1,244 @@
+@import "./atoms-ide-layout.css";
+@import "./atoms-chat.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Critical: react-resizable-panels needs full height/width */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Light theme (default) */
+:root,
+.light {
+  color-scheme: light;
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+
+  /* IDE Surface tokens */
+  --ide-bg: #ffffff;
+  --ide-bg-deep: #f8f9fa;
+  --ide-surface: #f3f4f6;
+  --ide-surface-hover: #e5e7eb;
+  --ide-surface-active: #dbeafe;
+  --ide-border: #e5e7eb;
+  --ide-border-subtle: #f0f0f0;
+  --ide-text: #374151;
+  --ide-text-secondary: #6b7280;
+  --ide-text-muted: #9ca3af;
+  --ide-text-faint: #d1d5db;
+  --ide-panel-bg: #f9fafb;
+  --ide-topbar-bg: #ffffff;
+  --ide-tab-active-bg: #ffffff;
+  --ide-tab-hover-bg: #f3f4f6;
+  --ide-chat-bg: #f9fafb;
+  --ide-chat-input-bg: #ffffff;
+  --ide-overlay-bg: #ffffff;
+  --ide-settings-bg: #f9fafb;
+  --ide-settings-sidebar: #f3f4f6;
+  --ide-settings-item-hover: rgba(0, 0, 0, 0.05);
+  --ide-settings-item-active: rgba(0, 0, 0, 0.08);
+  --ide-menu-bg: #ffffff;
+  --ide-menu-border: #e5e7eb;
+  --ide-credit-bg: #f3f4f6;
+  --ide-progress-track: #e5e7eb;
+}
+
+/* Dark theme */
+.dark {
+  color-scheme: dark;
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+
+  /* IDE Surface tokens */
+  --ide-bg: #0a0a0a;
+  --ide-bg-deep: #0d0d0d;
+  --ide-surface: #111111;
+  --ide-surface-hover: #1a1a1a;
+  --ide-surface-active: #1e1e1e;
+  --ide-border: #1a1a1a;
+  --ide-border-subtle: rgba(255, 255, 255, 0.05);
+  --ide-text: #e5e5e5;
+  --ide-text-secondary: #a1a1aa;
+  --ide-text-muted: #6b7280;
+  --ide-text-faint: rgba(255, 255, 255, 0.3);
+  --ide-panel-bg: #0b0b0b;
+  --ide-topbar-bg: #111111;
+  --ide-tab-active-bg: #1a1a1a;
+  --ide-tab-hover-bg: #151515;
+  --ide-chat-bg: #111111;
+  --ide-chat-input-bg: #0a0a0a;
+  --ide-overlay-bg: #1a1a1a;
+  --ide-settings-bg: #1a1a1a;
+  --ide-settings-sidebar: #2a2a2a;
+  --ide-settings-item-hover: rgba(255, 255, 255, 0.05);
+  --ide-settings-item-active: rgba(255, 255, 255, 0.1);
+  --ide-menu-bg: #111111;
+  --ide-menu-border: #1f1f1f;
+  --ide-credit-bg: #0a0a0a;
+  --ide-progress-track: #1f1f1f;
+}
+
+/* Panel resize system */
+[data-group] {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+[data-panel] {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Separator styling */
+[data-separator] {
+  background: hsl(var(--border));
+  transition: background 0.15s;
+}
+
+[data-separator]:hover,
+[data-separator][data-separator="active"] {
+  background: rgba(37, 99, 235, 0.3);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer utilities {
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+}
+
+.vibe-coder-logo {
+  font-family: 'Permanent Marker', cursive;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  50% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+/* AI Start Panel glow */
+@keyframes ai-start-glow-pulse {
+
+  0%,
+  100% {
+    opacity: 0.3;
+    filter: blur(24px);
+  }
+
+  50% {
+    opacity: 0.5;
+    filter: blur(28px);
+  }
+}
+
+.ai-start-glow {
+  background: radial-gradient(ellipse 80% 80% at 50% 50%, rgba(14, 99, 156, 0.25) 0%, rgba(79, 195, 247, 0.1) 40%, transparent 70%);
+  animation: ai-start-glow-pulse 10s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Bounce animation for dots */
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}

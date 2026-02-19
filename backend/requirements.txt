@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+email-validator
+python-jose[cryptography]
+bcrypt
+python-dotenv
+requests
+psycopg2-binary
+alembic
+pytest
+openai>=1.0.0
+
+# Phase-1: Agent Observability & Intelligence
+faiss-cpu>=1.7.4
+numpy>=1.24.0

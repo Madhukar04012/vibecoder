@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files
+generated/
+generated_projects/
+output/
+demo_*.txt
+
+# Reference / vendored code (optional; not used by app)
+project/
+
+# Node (for frontend)
+node_modules/
+.next/
+
+# Logs
+*.log
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Keep .env.example but ignore .env
+!.env.example
+
+# Frontend build
+frontend/dist/
+
+# Debug / Cursor
+.cursor/debug.log
