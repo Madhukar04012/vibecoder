@@ -4,7 +4,7 @@ Endpoints for the IDE + AI Team workspace
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request as HTTPRequest
 
 logger = logging.getLogger(__name__)
 from pydantic import BaseModel
@@ -17,6 +17,11 @@ import re
 import atexit
 import socket
 import time
+from backend.utils import validate_command, sanitize_command
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/studio", tags=["studio"])
 
@@ -678,8 +683,21 @@ async def run_command(request: RunRequest):
 
 
 @router.post("/execute", response_model=RunResponse)
-async def execute_command(request: ExecuteRequest):
-    """Phase 3: Run arbitrary command in project directory (e.g. npm install, npm run build)"""
+@limiter.limit("30/minute")  # Limit command execution
+async def execute_command(request: ExecuteRequest, http_request: HTTPRequest):
+    """Phase 3: Run command in project directory with security validation"""
+    # Sanitize command first
+    command = sanitize_command(request.command)
+
+    # Validate command against security rules
+    is_valid, error_msg = validate_command(command)
+    if not is_valid:
+        logger.warning(f"Blocked dangerous command: {command} - Reason: {error_msg}")
+        raise HTTPException(
+            status_code=403,
+            detail=f"Command blocked for security: {error_msg}"
+        )
+
     try:
         project_path = get_project_path(request.project_id)
     except ValueError as e:
@@ -687,8 +705,9 @@ async def execute_command(request: ExecuteRequest):
     os.makedirs(project_path, exist_ok=True)
 
     try:
+        # Use shell=True but with validated command
         result = subprocess.run(
-            request.command,
+            command,
             shell=True,
             cwd=project_path,
             capture_output=True,

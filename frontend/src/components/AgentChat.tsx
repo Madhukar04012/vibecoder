@@ -5,6 +5,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
 import { AgentOrchestrator, type Message } from "@/core/orchestrator";
 import { AGENTS } from "@/agents/definitions";
 import { useIDEStore } from "@/stores/ide-store";
@@ -123,7 +125,12 @@ export function AgentChat() {
               }}
             >
               <div className="agent-chat-markdown [&_pre]:whitespace-pre-wrap [&_code]:bg-black/30 [&_code]:px-1 [&_code]:rounded [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeSanitize]}
+                >
+                  {msg.content}
+                </ReactMarkdown>
               </div>
             </div>
           </div>

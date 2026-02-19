@@ -301,11 +301,23 @@ export const useIDEStore = create<IDEState>((set, get) => ({
   updateLastAssistantMessage: (content) =>
     set((s) => {
       const next = [...s.chatMessages];
+      let target = -1;
       for (let i = next.length - 1; i >= 0; i--) {
-        if (next[i].role === 'assistant') {
-          next[i] = { ...next[i], content };
+        if (next[i].role === 'assistant' && next[i].isStreaming) {
+          target = i;
           break;
         }
+      }
+      if (target === -1) {
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].role === 'assistant') {
+            target = i;
+            break;
+          }
+        }
+      }
+      if (target !== -1) {
+        next[target] = { ...next[target], content };
       }
       return { chatMessages: next };
     }),
@@ -313,11 +325,23 @@ export const useIDEStore = create<IDEState>((set, get) => ({
   appendToLastAssistantMessage: (token) =>
     set((s) => {
       const next = [...s.chatMessages];
+      let target = -1;
       for (let i = next.length - 1; i >= 0; i--) {
-        if (next[i].role === 'assistant') {
-          next[i] = { ...next[i], content: next[i].content + token };
+        if (next[i].role === 'assistant' && next[i].isStreaming) {
+          target = i;
           break;
         }
+      }
+      if (target === -1) {
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].role === 'assistant') {
+            target = i;
+            break;
+          }
+        }
+      }
+      if (target !== -1) {
+        next[target] = { ...next[target], content: next[target].content + token };
       }
       return { chatMessages: next };
     }),
@@ -446,26 +470,16 @@ export function restoreIDEState(): void {
     if (!raw) return;
 
     const saved = JSON.parse(raw) as PersistedIDE;
-    if (!Array.isArray(saved.openFiles)) return;
+    if (!Array.isArray(saved.openFiles) || saved.openFiles.length === 0) return;
 
-    // Only restore tabs if there are file contents to show.
-    // Without content, tabs would show as blank (ghost tabs).
-    const state = useIDEStore.getState();
-    const hasContent = saved.openFiles.some(
-      (f) => state.fileContents[f] && state.fileContents[f].length > 0
-    );
-
-    if (!hasContent) {
-      // Clear stale persistence — no point keeping empty tabs
-      localStorage.removeItem(IDE_PERSIST_KEY);
-      return;
-    }
-
+    // Restore the open files and active file
+    // File contents will be loaded separately by the file loading mechanism
     useIDEStore.setState({
       openFiles: saved.openFiles,
       activeFile: saved.activeFile ?? null,
     });
   } catch {
     // Corrupted state → ignore, start fresh
+    localStorage.removeItem(IDE_PERSIST_KEY);
   }
 }

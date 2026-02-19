@@ -181,6 +181,7 @@ function AgentStatusBubble({ message }: { message: ChatMessage }) {
 const EVENT_ICONS: Record<string, typeof Brain> = {
   run_started: Play,
   budget_configured: Settings,
+  model_configured: Brain,
   execution_plan: FileCode,
   project_analyzed: Search,
   stack_detected: Layers,
@@ -199,6 +200,7 @@ const EVENT_ICONS: Record<string, typeof Brain> = {
 const EVENT_COLORS: Record<string, string> = {
   run_started: 'text-emerald-400',
   budget_configured: 'text-amber-400',
+  model_configured: 'text-sky-400',
   execution_plan: 'text-blue-400',
   project_analyzed: 'text-cyan-400',
   stack_detected: 'text-purple-400',
@@ -210,6 +212,7 @@ const EVENT_COLORS: Record<string, string> = {
 const EVENT_BG: Record<string, string> = {
   run_started: 'border-emerald-500/20 bg-emerald-500/5',
   budget_configured: 'border-amber-500/20 bg-amber-500/5',
+  model_configured: 'border-sky-500/20 bg-sky-500/5',
   execution_plan: 'border-blue-500/20 bg-blue-500/5',
   project_analyzed: 'border-cyan-500/20 bg-cyan-500/5',
   stack_detected: 'border-purple-500/20 bg-purple-500/5',
@@ -225,9 +228,12 @@ function EventCardBubble({ message }: { message: ChatMessage }) {
   const IconComp = EVENT_ICONS[eventType] || Brain;
   const color = EVENT_COLORS[eventType] || 'text-blue-400';
   const bgColor = EVENT_BG[eventType] || 'border-blue-500/20 bg-blue-500/5';
+  const humanLabel = eventType
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 
   // Show real content if available, otherwise just the label
-  const displayContent = message.content !== eventType ? message.content : eventType;
+  const displayContent = message.content !== eventType ? message.content : humanLabel;
   const hasDetail = displayContent !== eventType;
 
   return (
@@ -250,7 +256,7 @@ function EventCardBubble({ message }: { message: ChatMessage }) {
             </span>
           ) : (
             <span className="font-mono text-[13px] font-medium" style={{ color: 'var(--ide-text)' }}>
-              {eventType}
+              {humanLabel}
             </span>
           )}
         </div>
@@ -282,6 +288,11 @@ function AITeamTypingIndicator() {
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
+
+  // The stream placeholder is intentionally empty; use the dedicated typing indicator instead.
+  if (!isUser && message.isStreaming && !message.content.trim() && (!message.files || message.files.length === 0)) {
+    return null;
+  }
 
   // Route to specialized bubbles
   if (!isUser && message.messageType === 'event_card') {
@@ -654,6 +665,7 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
       isStreaming: true,
       files: [],
     });
+    appendToLastAssistantMessage("Team Leader: I received your prompt. Starting live analysis...\n");
 
     // Fire the ATMOS pipeline — everything else is event-driven
     try {
@@ -955,16 +967,16 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
               ) : (
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() && attachments.length === 0}
+                  disabled={!input.trim()}
                   className={cn(
                     "p-2.5 rounded-xl flex items-center justify-center transition-all duration-200",
                     "disabled:opacity-30 disabled:cursor-not-allowed",
-                    input.trim() || attachments.length > 0
+                    input.trim()
                       ? "bg-blue-500 hover:bg-blue-600 text-white shadow-lg shadow-blue-500/25"
                       : "bg-var(--ide-surface-hover)"
                   )}
                   style={{ 
-                    color: input.trim() || attachments.length > 0 ? 'white' : 'var(--ide-text-muted)'
+                    color: input.trim() ? 'white' : 'var(--ide-text-muted)'
                   }}
                   title="Send message"
                 >

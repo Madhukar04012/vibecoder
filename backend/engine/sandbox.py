@@ -27,7 +27,9 @@ import shutil
 import subprocess
 import tempfile
 import uuid
-from typing import Any, Dict, List, Optional
+import shlex
+import re
+from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +42,29 @@ from backend.engine.events import get_event_emitter, EngineEventType
 
 DEFAULT_TIMEOUT = 60  # seconds
 MAX_OUTPUT_SIZE = 50000  # characters
+
+# Security: Whitelist of allowed commands
+ALLOWED_COMMANDS = {
+    'python', 'python3', 'pip', 'pip3', 'node', 'npm', 'yarn',
+    'cargo', 'rustc', 'go', 'javac', 'java', 'ruby', 'gem',
+    'php', 'composer', 'dotnet', 'dotnet', 'make', 'cmake',
+    'gcc', 'g++', 'clang', 'clang++', 'git', 'docker', 'docker-compose',
+    'pytest', 'mocha', 'jest', 'cargo test', 'go test', 'unittest',
+}
+
+# Security: Dangerous patterns that should be rejected
+DANGEROUS_PATTERNS = [
+    r'[;&|]\s*(?:rm|mv|cp|dd|mkfs|fdisk|format)',
+    r'\b(?:curl|wget)\s+.*\|.*(?:sh|bash|zsh)',
+    r'`[^`]*`',
+    r'\$\([^)]*\)',
+    r'>>>',
+    r'<\s*/dev/(?:tcp|udp)',
+    r'base64\s+-d',
+    r'eval\s*\(',
+    r'exec\s*\(',
+    r'system\s*\(',
+]
 
 
 # ─── Execution Result ───────────────────────────────────────────────────────
@@ -120,7 +145,7 @@ class Sandbox:
                 files.append(rel.replace('\\', '/'))
         return files
     
-    def copy_from_project(self, project_path: str, exclude: List[str] = None) -> int:
+    def copy_from_project(self, project_path: str, exclude: Optional[List[str]] = None) -> int:
         """
         Copy project files into the sandbox.
         
@@ -167,19 +192,61 @@ class Sandbox:
         
         return count
     
+    def _validate_command(self, command: str) -> tuple[bool, str]:
+        """
+        Validate command for security issues.
+        
+        Returns:
+            (is_valid, error_message)
+        """
+        # Check for dangerous patterns
+        for pattern in DANGEROUS_PATTERNS:
+            if re.search(pattern, command, re.IGNORECASE):
+                return False, f"Security violation: Dangerous pattern detected"
+        
+        # Parse command to get the base command
+        try:
+            # Use shlex to safely parse the command
+            args = shlex.split(command)
+            if not args:
+                return False, "Empty command"
+            
+            base_cmd = args[0]
+            
+            # Allow if it's in whitelist OR it's a path to an executable
+            if '/' in base_cmd or '\\' in base_cmd:
+                # It's a path - extract the command name
+                cmd_name = os.path.basename(base_cmd)
+            else:
+                cmd_name = base_cmd
+            
+            # Check if command is in whitelist
+            if cmd_name not in ALLOWED_COMMANDS:
+                return False, f"Command '{cmd_name}' not in allowed list"
+            
+            return True, ""
+            
+        except ValueError as e:
+            return False, f"Invalid command syntax: {e}"
+
     def execute(
         self,
-        command: str,
+        command: Union[str, List[str]],
         timeout: int = DEFAULT_TIMEOUT,
-        env: Dict[str, str] = None,
+        env: Optional[Dict[str, str]] = None,
+        shell: bool = False,
     ) -> ExecutionResult:
         """
         Execute a command inside the sandbox.
         
+        SECURITY NOTE: By default, shell=False for safety. 
+        If shell=True is needed, command will be validated against whitelist.
+        
         Args:
-            command: Shell command to run
+            command: Command to run (string or list of args)
             timeout: Hard timeout in seconds
             env: Additional environment variables
+            shell: If True, run through shell (validated for security)
             
         Returns:
             ExecutionResult with stdout, stderr, exit code
@@ -191,18 +258,54 @@ class Sandbox:
         # Restrict PATH-like vars to sandbox
         run_env["SANDBOX_ID"] = self.id
         
+        # Convert list to string for logging
+        if isinstance(command, list):
+            command_str = ' '.join(shlex.quote(str(arg)) for arg in command)
+        else:
+            command_str = command
+        
         start = datetime.utcnow()
         
+        # SECURITY: Validate command if using shell
+        if shell and isinstance(command, str):
+            is_valid, error_msg = self._validate_command(command)
+            if not is_valid:
+                return ExecutionResult(
+                    success=False,
+                    exit_code=-1,
+                    stdout="",
+                    stderr=f"Security error: {error_msg}",
+                    duration_ms=0.0,
+                    command=command_str,
+                    sandbox_path=self.path,
+                )
+        
         try:
-            proc = subprocess.run(
-                command,
-                shell=True,
-                cwd=self.path,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                env=run_env,
-            )
+            if shell and isinstance(command, str):
+                # Use shell=True only after validation
+                proc = subprocess.run(
+                    command,
+                    shell=True,
+                    cwd=self.path,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    env=run_env,
+                )
+            else:
+                # Safe: shell=False with list or validated string
+                if isinstance(command, str):
+                    command = shlex.split(command)
+                
+                proc = subprocess.run(
+                    command,
+                    shell=False,
+                    cwd=self.path,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    env=run_env,
+                )
             
             duration = (datetime.utcnow() - start).total_seconds() * 1000
             
@@ -212,19 +315,23 @@ class Sandbox:
                 stdout=proc.stdout[:MAX_OUTPUT_SIZE],
                 stderr=proc.stderr[:MAX_OUTPUT_SIZE],
                 duration_ms=duration,
-                command=command,
+                command=command_str,
                 sandbox_path=self.path,
             )
             
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
             duration = timeout * 1000
+            # Try to capture partial output
+            stdout = e.stdout.decode('utf-8', errors='replace')[:MAX_OUTPUT_SIZE] if e.stdout else ""
+            stderr = e.stderr.decode('utf-8', errors='replace')[:MAX_OUTPUT_SIZE] if e.stderr else f"Command timed out after {timeout}s"
+            
             result = ExecutionResult(
                 success=False,
                 exit_code=-1,
-                stdout="",
-                stderr=f"Command timed out after {timeout}s",
+                stdout=stdout,
+                stderr=stderr,
                 duration_ms=duration,
-                command=command,
+                command=command_str,
                 sandbox_path=self.path,
             )
         except Exception as e:
@@ -235,7 +342,7 @@ class Sandbox:
                 stdout="",
                 stderr=str(e),
                 duration_ms=duration,
-                command=command,
+                command=command_str,
                 sandbox_path=self.path,
             )
         

@@ -2,6 +2,7 @@
 Tiered token governance with daily spend caps.
 
 Tracks per-user daily spend and provides per-run budget ceilings.
+Uses Decimal for precise financial calculations.
 """
 
 from __future__ import annotations
@@ -12,7 +13,8 @@ from dataclasses import dataclass
 from datetime import date
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
+from decimal import Decimal, ROUND_HALF_UP
 import os
 
 
@@ -24,12 +26,12 @@ class TokenTier(str, Enum):
 
 @dataclass(frozen=True)
 class TierBudget:
-    daily_cap_usd: float | None  # None == unlimited
+    daily_cap_usd: Decimal | None  # None == unlimited
 
 
 DEFAULT_TIERS: Dict[TokenTier, TierBudget] = {
-    TokenTier.FREE: TierBudget(daily_cap_usd=float(os.getenv("FREE_DAILY_CAP_USD", "1.0"))),
-    TokenTier.PRO: TierBudget(daily_cap_usd=float(os.getenv("PRO_DAILY_CAP_USD", "25.0"))),
+    TokenTier.FREE: TierBudget(daily_cap_usd=Decimal(os.getenv("FREE_DAILY_CAP_USD", "1.0"))),
+    TokenTier.PRO: TierBudget(daily_cap_usd=Decimal(os.getenv("PRO_DAILY_CAP_USD", "25.0"))),
     TokenTier.ENTERPRISE: TierBudget(daily_cap_usd=None),
 }
 
@@ -78,9 +80,11 @@ class TokenGovernance:
         key_date = day or self._today()
         with self._lock:
             data = self._read()
-            spent = float(data.get(key_date, {}).get(user_id, {}).get("spent_usd", 0.0))
+            spent_raw = data.get(key_date, {}).get(user_id, {}).get("spent_usd", 0.0)
+            spent = Decimal(str(spent_raw))
 
-        return max(0.0, cap - spent)
+        remaining = max(Decimal("0"), cap - spent)
+        return float(remaining.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP))
 
     def apply_spend(
         self,
@@ -98,10 +102,14 @@ class TokenGovernance:
             day_bucket = data.setdefault(key_date, {})
             entry = day_bucket.setdefault(
                 user_id,
-                {"tier": normalized_tier.value, "spent_usd": 0.0},
+                {"tier": normalized_tier.value, "spent_usd": "0"},
             )
             entry["tier"] = normalized_tier.value
-            entry["spent_usd"] = round(float(entry.get("spent_usd", 0.0)) + max(0.0, spend_usd), 6)
+            # Use Decimal for precision
+            current = Decimal(str(entry.get("spent_usd", "0")))
+            spend_decimal = Decimal(str(spend_usd)) if isinstance(spend_usd, (int, float)) else spend_usd
+            new_total = current + max(Decimal("0"), spend_decimal)
+            entry["spent_usd"] = str(new_total.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP))
             self._write(data)
 
     def get_summary(
@@ -115,16 +123,17 @@ class TokenGovernance:
         key_date = day or self._today()
         with self._lock:
             data = self._read()
-            spent = float(data.get(key_date, {}).get(user_id, {}).get("spent_usd", 0.0))
+            spent_str = data.get(key_date, {}).get(user_id, {}).get("spent_usd", "0")
+            spent = Decimal(str(spent_str))
 
-        remaining = None if cap is None else max(0.0, cap - spent)
+        remaining = None if cap is None else max(Decimal("0"), cap - spent)
         return {
             "date": key_date,
             "user_id": user_id,
             "tier": normalized_tier.value,
-            "daily_cap_usd": cap,
-            "spent_usd": round(spent, 6),
-            "remaining_usd": None if remaining is None else round(remaining, 6),
+            "daily_cap_usd": None if cap is None else float(cap.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)),
+            "spent_usd": float(spent.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)),
+            "remaining_usd": None if remaining is None else float(remaining.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)),
         }
 
 

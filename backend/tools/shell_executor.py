@@ -142,6 +142,25 @@ class ShellSessionManager:
         # Use subprocess for cross-platform compatibility
         return await self._execute_subprocess(session, command, timeout)
     
+    async def _cleanup_previous_process(self, session: ShellSession) -> None:
+        """Clean up any previously running process in the session."""
+        if session.process is not None:
+            try:
+                if session.process.returncode is None:
+                    # Process is still running, terminate it
+                    session.process.terminate()
+                    try:
+                        await asyncio.wait_for(session.process.wait(), timeout=2.0)
+                    except asyncio.TimeoutError:
+                        # Force kill if graceful termination fails
+                        session.process.kill()
+                        await session.process.wait()
+            except Exception:
+                # Ignore errors during cleanup
+                pass
+            finally:
+                session.process = None
+    
     async def _execute_subprocess(
         self, 
         session: ShellSession, 
@@ -150,6 +169,9 @@ class ShellSessionManager:
     ) -> Dict[str, any]:
         """Execute command using subprocess (cross-platform)."""
         try:
+            # Clean up any previous process to prevent resource leaks
+            await self._cleanup_previous_process(session)
+            
             # Determine shell based on platform
             if IS_WINDOWS:
                 shell_cmd = ["cmd", "/c", command]

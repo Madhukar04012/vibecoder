@@ -14,14 +14,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import logging
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
-# Configure logging before any other imports that may log
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    stream=sys.stderr,
-    force=True,
-)
+# Configure structured logging
+_env = os.getenv("ENV", "development").lower()
+_structured_logging = _env == "production"
+
+if _structured_logging:
+    # JSON structured logging for production
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+        stream=sys.stderr,
+        force=True,
+    )
+else:
+    # Human-readable logging for development
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        stream=sys.stderr,
+        force=True,
+    )
 
 from backend.database import Base, engine
 from backend.api import auth, projects, team_lead, tasks, agents, logs
@@ -39,6 +55,8 @@ from backend.api.marketplace import router as marketplace_router
 from backend.api.snapshot import router as snapshot_router
 from backend.api.atmos import router as atmos_router
 from backend.api.pipeline_governance import router as pipeline_governance_router
+from backend.api.agent_chat import router as agent_chat_router
+from backend.api.society import router as society_router
 
 # Import all models to ensure they're registered
 from backend.models import (
@@ -73,8 +91,19 @@ def _validate_env() -> None:
             )
 
 
-# Create all database tables
-Base.metadata.create_all(bind=engine)
+# Initialize database tables
+# Try to run migrations first, fall back to create_all if migrations unavailable
+try:
+    from backend.migrate_db import run_migrations
+    migrations_successful = run_migrations()
+    if not migrations_successful:
+        logger.info("Using create_all as fallback")
+except Exception as e:
+    logger.warning(f"Migrations unavailable, using create_all: {e}")
+    Base.metadata.create_all(bind=engine)
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute", "1000/hour"])
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
@@ -91,13 +120,36 @@ app = FastAPI(
     lifespan=_lifespan,
 )
 
-# CORS: set CORS_ORIGINS in production (e.g. "https://app.example.com"); default "*" for dev
-_cors_origins = os.getenv("CORS_ORIGINS", "*").strip()
-_cors_list = [o.strip() for o in _cors_origins.split(",") if o.strip()] if _cors_origins != "*" else ["*"]
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS: set CORS_ORIGINS in production (e.g. "https://app.example.com")
+# Default: allow localhost in development only
+_env = os.getenv("ENV", "development").lower()
+_cors_origins = os.getenv("CORS_ORIGINS", "").strip()
+
+if _cors_origins:
+    # User explicitly set CORS_ORIGINS
+    _cors_list = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+elif _env == "production":
+    # Production: require explicit configuration, fail-safe to empty
+    logger.warning("Production mode requires CORS_ORIGINS to be set. Using empty list (no CORS).")
+    _cors_list = []
+else:
+    # Development: allow localhost variants
+    _cors_list = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ]
+    logger.info(f"Development mode: allowing CORS from localhost: {_cors_list}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_list,
-    allow_credentials=False if _cors_list == ["*"] else True,
+    allow_credentials=True,  # Always enable credentials with explicit origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -151,6 +203,10 @@ app.include_router(atmos_router)
 
 # Unified Pipeline Governance
 app.include_router(pipeline_governance_router)
+
+# Agent Chat Proxy (secure Anthropic API access)
+app.include_router(agent_chat_router)
+app.include_router(society_router)
 
 
 # ---------- Global exception handler ----------

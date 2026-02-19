@@ -316,20 +316,20 @@ async def _stream_llm_to_sse(system: str, user: str, file_path: str, max_tokens:
     pushes them into an asyncio.Queue, and yields SSE events from the queue.
     """
     queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
     sentinel = object()  # signals "done"
 
     def _produce():
         try:
             for token in _stream_llm_sync(system, user, max_tokens, temp, use_coder):
                 if token:
-                    queue.put_nowait(token)
+                    loop.call_soon_threadsafe(queue.put_nowait, token)
         except Exception as exc:
-            queue.put_nowait(exc)
+            loop.call_soon_threadsafe(queue.put_nowait, exc)
         finally:
-            queue.put_nowait(sentinel)
+            loop.call_soon_threadsafe(queue.put_nowait, sentinel)
 
     # Start producer in a thread
-    loop = asyncio.get_event_loop()
     loop.run_in_executor(None, _produce)
 
     content_parts = []
@@ -1040,11 +1040,12 @@ async def _stream_unified_standard(prompt: str, files: dict) -> AsyncGenerator[s
     from backend.storage.artifact_store import flatten_structure, get_artifact_store
 
     queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
     result_holder: dict = {}
     sentinel = object()
 
     def _emit(event_name: str, payload: dict) -> None:
-        queue.put_nowait((event_name, payload))
+        loop.call_soon_threadsafe(queue.put_nowait, (event_name, payload))
 
     def _runner():
         req = PipelineRequest(
@@ -1057,17 +1058,49 @@ async def _stream_unified_standard(prompt: str, files: dict) -> AsyncGenerator[s
             memory_scope="project",
         )
         result_holder["result"] = run_pipeline(req, PipelineContext(on_event=_emit, strict_contracts=True))
-        queue.put_nowait((sentinel, {}))
+        loop.call_soon_threadsafe(queue.put_nowait, (sentinel, {}))
 
-    asyncio.get_event_loop().run_in_executor(None, _runner)
+    loop.run_in_executor(None, _runner)
+
+    agent_meta: Dict[str, tuple[str, str]] = {
+        "planner": ("Planner", "map"),
+        "db_schema": ("Architect", "layers"),
+        "auth": ("Engineer", "code"),
+        "coder": ("Engineer", "code"),
+        "code_reviewer": ("QA Engineer", "shield"),
+        "tester": ("QA Engineer", "shield"),
+        "deployer": ("DevOps", "rocket"),
+    }
+
+    agent_thinking: Dict[str, str] = {
+        "planner": "Breaking down your request into an execution strategy.",
+        "db_schema": "Designing data structures and schema boundaries.",
+        "auth": "Planning authentication and access control flow.",
+        "coder": "Implementing the project files and feature logic.",
+        "code_reviewer": "Reviewing generated code for quality and risk.",
+        "tester": "Validating behavior and checking for regressions.",
+        "deployer": "Preparing install/build/deploy runtime steps.",
+    }
+
+    def _agent_display(agent_id: str) -> tuple[str, str]:
+        return agent_meta.get(agent_id, (agent_id.replace("_", " ").title(), "brain"))
+
+    async def _emit_tokens(text: str, chunk_size: int = 14, delay_s: float = 0.01) -> AsyncGenerator[str, None]:
+        if not text:
+            return
+        for i in range(0, len(text), chunk_size):
+            yield sse("message_token", {"token": text[i:i + chunk_size]})
+            await asyncio.sleep(delay_s)
 
     event_map = {
         "agent_started": "agent_start",
         "agent_completed": "agent_end",
         "agent_failed": "agent_error",
+        "execution_plan": "execution_plan",
+        "budget_configured": "budget_configured",
         "state_transition": "blackboard_update",
         "agent_retry": "message",
-        "run_started": "message",
+        "run_started": "run_started",
         "run_failed": "error",
         "run_timeout": "error",
         "run_finished": "message",
@@ -1080,18 +1113,77 @@ async def _stream_unified_standard(prompt: str, files: dict) -> AsyncGenerator[s
 
         sse_type = event_map.get(name, "message")
         if sse_type == "agent_start":
-            yield sse(sse_type, {"agent": payload.get("agent", "unknown"), "description": f"Attempt {payload.get('attempt', 1)}"})
+            agent_id = payload.get("agent", "unknown")
+            display_name, icon = _agent_display(agent_id)
+            attempt = payload.get("attempt", 1)
+            yield sse(sse_type, {
+                "agent": agent_id,
+                "name": display_name,
+                "icon": icon,
+                "description": f"{display_name} running (attempt {attempt})",
+            })
         elif sse_type == "agent_end":
-            yield sse(sse_type, {"agent": payload.get("agent", "unknown"), "result": f"Completed in {payload.get('duration_ms', 0)}ms"})
+            agent_id = payload.get("agent", "unknown")
+            display_name, icon = _agent_display(agent_id)
+            yield sse(sse_type, {
+                "agent": agent_id,
+                "name": display_name,
+                "icon": icon,
+                "result": f"Completed in {payload.get('duration_ms', 0)}ms",
+            })
         elif sse_type == "agent_error":
             yield sse("error", {"message": f"{payload.get('agent', 'agent')} failed: {payload.get('error', 'unknown error')}"})
         elif sse_type == "blackboard_update":
             yield sse("blackboard_update", {"field": "state", "value": payload.get("state")})
+        elif sse_type in {"run_started", "budget_configured", "execution_plan"}:
+            event_payload = dict(payload)
+            if sse_type == "run_started":
+                chat_model = os.getenv("NIM_MODEL", "").strip()
+                coder_model = os.getenv("NIM_CODER_MODEL", "").strip() or chat_model
+                if chat_model:
+                    event_payload["chat_model"] = chat_model
+                if coder_model:
+                    event_payload["coder_model"] = coder_model
+                intro = (
+                    "Team Leader: I received your prompt. "
+                    "I am analyzing requirements and assigning the team now.\n\n"
+                )
+                async for token_evt in _emit_tokens(intro):
+                    yield token_evt
+            elif sse_type == "execution_plan":
+                order = event_payload.get("execution_order")
+                if isinstance(order, list) and order:
+                    readable = " -> ".join(str(x).replace("_", " ") for x in order)
+                    plan_text = f"Planner: Execution plan ready: {readable}.\n\n"
+                else:
+                    plan_text = "Planner: Execution plan is ready.\n\n"
+                async for token_evt in _emit_tokens(plan_text):
+                    yield token_evt
+            yield sse(sse_type, event_payload)
         elif sse_type == "error":
             yield sse("error", {"message": payload.get("error", payload.get("message", "pipeline error"))})
         else:
             message = payload.get("message") or payload.get("event") or name
             yield sse("message", {"content": str(message)})
+
+        if sse_type == "agent_start":
+            agent_id = payload.get("agent", "unknown")
+            display_name, _ = _agent_display(agent_id)
+            thinking = agent_thinking.get(agent_id, "Working on the assigned step.")
+            async for token_evt in _emit_tokens(f"{display_name}: {thinking}\n"):
+                yield token_evt
+
+        if sse_type == "agent_end":
+            agent_id = payload.get("agent", "unknown")
+            display_name, _ = _agent_display(agent_id)
+            result = payload.get("duration_ms")
+            completion = (
+                f"{display_name}: Completed this step in {result}ms.\n\n"
+                if result is not None
+                else f"{display_name}: Completed this step.\n\n"
+            )
+            async for token_evt in _emit_tokens(completion):
+                yield token_evt
 
     result = result_holder.get("result", {})
     manifest = result.get("artifact_manifest") or {}
@@ -1109,9 +1201,13 @@ async def _stream_unified_standard(prompt: str, files: dict) -> AsyncGenerator[s
 
     total = len(files_map)
     for idx, (path, content) in enumerate(files_map.items(), start=1):
+        async for token_evt in _emit_tokens(f"Engineer: Writing {path} ({idx}/{total})...\n", chunk_size=18, delay_s=0.006):
+            yield token_evt
         yield sse("file_start", {"path": path, "index": idx, "total": total})
         yield sse("file_delta", {"path": path, "delta": content})
         yield sse("file_end", {"path": path, "index": idx, "total": total})
+        async for token_evt in _emit_tokens(f"Engineer: Finished {path}.\n", chunk_size=18, delay_s=0.004):
+            yield token_evt
 
     state = result.get("state", "unknown")
     yield sse("message", {"content": f"Unified pipeline finished with state={state}. Files: {total}"})

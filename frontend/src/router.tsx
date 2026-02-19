@@ -16,6 +16,8 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Login from "@/pages/auth/Login";
 import Signup from "@/pages/auth/Signup";
 import Dashboard from "@/pages/Dashboard";
+import NewProject from "@/pages/NewProject";
+import RunView from "@/pages/RunView";
 import VibeCober from "@/components/VibeCober";
 import NovaIDE from "@/components/NovaIDE";
 
@@ -37,7 +39,8 @@ function RedirectIfAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
   {
     element: (
       <ThemeProvider>
@@ -89,6 +92,26 @@ export const router = createBrowserRouter([
           </RequireAuth>
         ),
       },
+      // Society: new project wizard
+      {
+        path: "/new-project",
+        element: (
+          <RequireAuth>
+            <NewProject />
+          </RequireAuth>
+        ),
+      },
+      // Society: run view (dashboard + documents)
+      {
+        path: "/run",
+        element: (
+          <RequireAuth>
+            <RunView />
+          </RequireAuth>
+        ),
+      },
     ],
   },
-]);
+],
+  { future: { v7_startTransition: true } }
+);

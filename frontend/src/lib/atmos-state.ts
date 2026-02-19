@@ -228,8 +228,10 @@ export async function runAtmosIntent(intent: string): Promise<void> {
     } catch (err: any) {
         if (err.name === 'AbortError') return; // User cancelled
         console.error('[ATMOS] Stream error:', err);
+        store.setError(err?.message ?? 'Connection lost');
         store.setStatus('Connection lost. Try again.');
         store.transition('idle');
+        throw err;
     } finally {
         store.setAbortController(null);
     }
@@ -240,6 +242,16 @@ export async function runAtmosIntent(intent: string): Promise<void> {
 // Map atoms_engine phases to atmos phases based on agent progress
 function agentToPhase(agent: string): AtmosPhase | null {
     switch (agent) {
+        // Unified pipeline agent ids
+        case 'planner': return 'interpreting';
+        case 'db_schema': return 'interpreting';
+        case 'auth': return 'interpreting';
+        case 'coder': return 'generating';
+        case 'code_reviewer': return 'generating';
+        case 'tester': return 'generating';
+        case 'deployer': return 'building';
+
+        // Legacy atoms ids
         case 'team_lead': return 'interpreting';
         case 'pm': return 'interpreting';
         case 'architect': return 'interpreting';
@@ -248,6 +260,98 @@ function agentToPhase(agent: string): AtmosPhase | null {
         case 'devops': return 'building';
         default: return null;
     }
+}
+
+const AGENT_NARRATIVE: Record<string, { name: string; icon: string; thinking: string; done: string }> = {
+    planner: {
+        name: 'Planner',
+        icon: 'map',
+        thinking: 'I am analyzing your request and turning it into a clear execution plan.',
+        done: 'Planning is complete. The execution order is ready for the team.',
+    },
+    db_schema: {
+        name: 'Architect',
+        icon: 'layers',
+        thinking: 'I am designing the data model and technical structure for this build.',
+        done: 'Architecture and schema decisions are complete.',
+    },
+    auth: {
+        name: 'Engineer',
+        icon: 'code',
+        thinking: 'I am wiring authentication and core access controls.',
+        done: 'Authentication layer is implemented and handed off.',
+    },
+    coder: {
+        name: 'Engineer',
+        icon: 'code',
+        thinking: 'I am generating project files and implementing the requested features.',
+        done: 'Core code generation is complete.',
+    },
+    code_reviewer: {
+        name: 'QA Engineer',
+        icon: 'shield',
+        thinking: 'I am reviewing generated code quality, safety, and consistency.',
+        done: 'Code review is complete with findings and recommendations.',
+    },
+    tester: {
+        name: 'QA Engineer',
+        icon: 'shield',
+        thinking: 'I am validating behavior and checking for regressions.',
+        done: 'QA checks are complete.',
+    },
+    deployer: {
+        name: 'DevOps',
+        icon: 'rocket',
+        thinking: 'I am preparing dependencies and runtime deployment.',
+        done: 'Deployment step is complete.',
+    },
+    team_lead: {
+        name: 'Team Leader',
+        icon: 'crown',
+        thinking: 'I am coordinating agents and managing execution flow.',
+        done: 'Coordination step is complete.',
+    },
+    pm: {
+        name: 'Product Manager',
+        icon: 'clipboard',
+        thinking: 'I am refining requirements and scope for execution.',
+        done: 'Requirements are finalized.',
+    },
+    architect: {
+        name: 'Architect',
+        icon: 'layers',
+        thinking: 'I am mapping architecture and component boundaries.',
+        done: 'Architecture design is complete.',
+    },
+    engineer: {
+        name: 'Engineer',
+        icon: 'code',
+        thinking: 'I am implementing the code now.',
+        done: 'Implementation for this step is complete.',
+    },
+    qa: {
+        name: 'QA Engineer',
+        icon: 'shield',
+        thinking: 'I am testing the output for quality and defects.',
+        done: 'Testing step is complete.',
+    },
+    devops: {
+        name: 'DevOps',
+        icon: 'rocket',
+        thinking: 'I am handling build and deployment setup.',
+        done: 'Build/deploy step is complete.',
+    },
+};
+
+function resolveAgentNarrative(agentId: string, payloadName?: string, payloadIcon?: string) {
+    const base = AGENT_NARRATIVE[agentId];
+    const fallbackName = agentId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return {
+        name: payloadName || base?.name || fallbackName,
+        icon: payloadIcon || base?.icon || 'brain',
+        thinking: base?.thinking || `${payloadName || fallbackName} is working on this step.`,
+        done: base?.done || `${payloadName || fallbackName} completed this step.`,
+    };
 }
 
 function handleAtmosEvent(event: any) {
@@ -264,8 +368,113 @@ function handleAtmosEvent(event: any) {
             store.setStatus(payload.message);
             break;
 
+        // ── Unified pipeline metadata events ─────────────────────
+        case 'run_started': {
+            const mode = typeof payload.mode === 'string' ? payload.mode : 'full';
+            const tier = typeof payload.token_tier === 'string' ? payload.token_tier : 'free';
+            const intent = (store.lastIntent || '').trim();
+            EventBus.emit('AI_MESSAGE', {
+                content: `Run started (${mode} mode, ${tier} tier)`,
+                role: 'assistant',
+                agentName: 'AI Team',
+                agentIcon: 'brain',
+                messageType: 'event_card',
+                eventType: 'run_started',
+                eventData: payload,
+            }, 'atoms');
+            EventBus.emit('AI_DISCUSSION', {
+                from: 'Team Leader',
+                to: 'All',
+                icon: 'crown',
+                message: intent
+                    ? `I received your requirement: "${intent}".\n\nI am assigning the team now and will post live thinking + execution updates as each agent works.`
+                    : 'I received your requirement. I am assigning the team now and will post live thinking + execution updates as each agent works.',
+            }, 'atoms');
+
+            const chatModel = typeof payload.chat_model === 'string' ? payload.chat_model : '';
+            const coderModel = typeof payload.coder_model === 'string' ? payload.coder_model : '';
+            if (chatModel || coderModel) {
+                const modelContent =
+                    chatModel && coderModel && chatModel !== coderModel
+                        ? `Models: Chat ${chatModel} | Code ${coderModel}`
+                        : `Model: ${coderModel || chatModel}`;
+                EventBus.emit('AI_MESSAGE', {
+                    content: modelContent,
+                    role: 'assistant',
+                    agentName: 'AI Team',
+                    agentIcon: 'brain',
+                    messageType: 'event_card',
+                    eventType: 'model_configured',
+                    eventData: { chatModel, coderModel },
+                }, 'atoms');
+            }
+            break;
+        }
+
+        case 'budget_configured': {
+            const tier = typeof payload.tier === 'string'
+                ? payload.tier
+                : (typeof payload.token_tier === 'string' ? payload.token_tier : 'free');
+
+            const cap = payload.daily_cap_usd;
+            const spent = Number(payload.spent_usd);
+            const remaining = Number(payload.remaining_usd);
+
+            const fmt = (n: number) => Number.isFinite(n) ? `$${n.toFixed(2)}` : null;
+            const capNum = typeof cap === 'number' ? cap : Number(cap);
+            const capText = cap == null ? 'No daily cap' : (fmt(capNum) ?? 'No daily cap');
+
+            let content = `Budget (${tier}): ${capText}`;
+            const remainingText = fmt(remaining);
+            const spentText = fmt(spent);
+            if (remainingText) content += ` | Remaining ${remainingText}`;
+            if (spentText) content += ` | Spent ${spentText}`;
+
+            EventBus.emit('AI_MESSAGE', {
+                content,
+                role: 'assistant',
+                agentName: 'AI Team',
+                agentIcon: 'brain',
+                messageType: 'event_card',
+                eventType: 'budget_configured',
+                eventData: payload,
+            }, 'atoms');
+            break;
+        }
+
+        case 'execution_plan': {
+            const order = Array.isArray(payload.execution_order)
+                ? payload.execution_order.map((s: any) => String(s).replace(/_/g, ' '))
+                : [];
+            const content = order.length > 0
+                ? `Execution plan: ${order.join(' -> ')}`
+                : 'Execution plan ready';
+
+            EventBus.emit('AI_MESSAGE', {
+                content,
+                role: 'assistant',
+                agentName: 'AI Team',
+                agentIcon: 'brain',
+                messageType: 'event_card',
+                eventType: 'execution_plan',
+                eventData: payload,
+            }, 'atoms');
+            EventBus.emit('AI_DISCUSSION', {
+                from: 'Team Leader',
+                to: 'All',
+                icon: 'crown',
+                message: content,
+            }, 'atoms');
+            break;
+        }
+
         // ── Agent lifecycle (from atoms_engine) ──────────────────
         case 'agent_start': {
+            const narrative = resolveAgentNarrative(
+                String(payload.agent || ''),
+                typeof payload.name === 'string' ? payload.name : undefined,
+                typeof payload.icon === 'string' ? payload.icon : undefined,
+            );
             const agentPhase = agentToPhase(payload.agent);
             if (agentPhase) {
                 const current = store.phase;
@@ -276,71 +485,69 @@ function handleAtmosEvent(event: any) {
             }
             EventBus.emit('AI_AGENT_START', {
                 agent: payload.agent,
-                name: payload.name,
-                icon: payload.icon,
+                name: narrative.name,
+                icon: narrative.icon,
                 description: payload.description,
             }, 'atoms');
 
-            // Emit run_started event card on first agent (team_lead)
-            if (payload.agent === 'team_lead') {
-                EventBus.emit('AI_MESSAGE', {
-                    content: 'run_started',
-                    role: 'assistant',
-                    agentName: 'AI Team',
-                    agentIcon: 'brain',
-                    messageType: 'event_card',
-                    eventType: 'run_started',
-                }, 'atoms');
-                EventBus.emit('TERMINAL_OUTPUT', { text: 'run_started', type: 'stdout' }, 'atoms');
-                // Emit budget_configured right after
-                EventBus.emit('AI_MESSAGE', {
-                    content: 'budget_configured',
-                    role: 'assistant',
-                    agentName: 'AI Team',
-                    agentIcon: 'brain',
-                    messageType: 'event_card',
-                    eventType: 'budget_configured',
-                }, 'atoms');
-                EventBus.emit('TERMINAL_OUTPUT', { text: 'budget_configured', type: 'stdout' }, 'atoms');
-            }
+            EventBus.emit('AI_DISCUSSION', {
+                from: narrative.name,
+                to: 'Team Leader',
+                icon: narrative.icon,
+                message: narrative.thinking,
+            }, 'atoms');
 
             // Show agent status in chat as event card
             EventBus.emit('AI_MESSAGE', {
-                content: payload.description || `${payload.name} is working...`,
+                content: payload.description || `${narrative.name} is working...`,
                 role: 'assistant',
-                agentName: payload.name,
-                agentIcon: payload.icon,
+                agentName: narrative.name,
+                agentIcon: narrative.icon,
                 messageType: 'agent_status',
                 eventType: `${payload.agent}_started`,
             }, 'atoms');
             // Route to terminal log
             EventBus.emit('TERMINAL_OUTPUT', {
-                text: `${payload.name || payload.agent}_started`,
+                text: `${narrative.name}_started`,
                 type: 'stdout',
             }, 'atoms');
             break;
         }
 
-        case 'agent_end':
+        case 'agent_end': {
+            const narrative = resolveAgentNarrative(
+                String(payload.agent || ''),
+                typeof payload.name === 'string' ? payload.name : undefined,
+                typeof payload.icon === 'string' ? payload.icon : undefined,
+            );
             EventBus.emit('AI_AGENT_END', {
                 agent: payload.agent,
                 result: payload.result,
+            }, 'atoms');
+            EventBus.emit('AI_DISCUSSION', {
+                from: narrative.name,
+                to: 'Team Leader',
+                icon: narrative.icon,
+                message: typeof payload.result === 'string' && payload.result.trim()
+                    ? `${narrative.done}\n${payload.result}`
+                    : narrative.done,
             }, 'atoms');
             if (payload.result) {
                 EventBus.emit('AI_MESSAGE', {
                     content: payload.result,
                     role: 'assistant',
-                    agentName: payload.name || payload.agent,
-                    agentIcon: payload.icon,
+                    agentName: narrative.name,
+                    agentIcon: narrative.icon,
                     messageType: 'agent_result',
                 }, 'atoms');
             }
             // Route to terminal log
             EventBus.emit('TERMINAL_OUTPUT', {
-                text: `${payload.name || payload.agent}_completed`,
+                text: `${narrative.name}_completed`,
                 type: 'stdout',
             }, 'atoms');
             break;
+        }
 
         // ── Agent-to-agent discussions ───────────────────────────
         case 'discussion':
@@ -357,6 +564,15 @@ function handleAtmosEvent(event: any) {
             EventBus.emit('AI_FILE_WRITING', {
                 path: payload.path,
             }, 'atoms');
+            if (payload.path) {
+                EventBus.emit('AI_MESSAGE', {
+                    content: `Writing ${payload.path}...`,
+                    role: 'assistant',
+                    agentName: 'Engineer',
+                    agentIcon: 'code',
+                    messageType: 'agent_status',
+                }, 'atoms');
+            }
             break;
 
         case 'file_delta':
@@ -372,6 +588,15 @@ function handleAtmosEvent(event: any) {
                 path: payload.path,
                 content: '', // content was streamed via deltas
             }, 'atoms');
+            if (payload.path) {
+                EventBus.emit('AI_MESSAGE', {
+                    content: `Finished ${payload.path}`,
+                    role: 'assistant',
+                    agentName: 'Engineer',
+                    agentIcon: 'code',
+                    messageType: 'agent_result',
+                }, 'atoms');
+            }
             break;
 
         // ── File events (atmos.py style) ─────────────────────────

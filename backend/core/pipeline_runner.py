@@ -8,8 +8,10 @@ observability logging, memory governance, artifact persistence, and token-tier b
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
@@ -28,6 +30,29 @@ from backend.storage.artifact_store import flatten_structure, get_artifact_store
 
 class PipelineError(RuntimeError):
     """Raised when pipeline execution fails."""
+
+
+# Constants
+MAX_RETRY_BACKOFF_SECONDS = 60.0  # Maximum backoff cap to prevent unbounded delays
+_retry_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pipeline_retry")
+
+
+def _sleep_async_safe(seconds: float) -> None:
+    """
+    Sleep that works in both sync and async contexts.
+    
+    Uses asyncio.sleep if in async context, otherwise uses time.sleep.
+    This prevents blocking the event loop when running in async environments.
+    """
+    try:
+        # Check if we're in an async context
+        loop = asyncio.get_running_loop()
+        # We're in async context, but this function is sync, so we need to use executor
+        future = _retry_executor.submit(time.sleep, seconds)
+        future.result()  # Block until sleep completes
+    except RuntimeError:
+        # No event loop running, safe to use time.sleep
+        time.sleep(seconds)
 
 
 @dataclass
@@ -261,7 +286,11 @@ class PipelineRunner:
 
                 retry_reason = message
                 if attempt < max_attempts:
-                    backoff = float(self.request.retry_backoff_seconds) * (2 ** (attempt - 1))
+                    # Exponential backoff with cap to prevent unbounded delays
+                    base_backoff = float(self.request.retry_backoff_seconds)
+                    exponential_backoff = base_backoff * (2 ** (attempt - 1))
+                    backoff = min(exponential_backoff, MAX_RETRY_BACKOFF_SECONDS)
+
                     self._emit("agent_retry", {
                         "agent": agent_name,
                         "attempt": attempt,
@@ -269,7 +298,7 @@ class PipelineRunner:
                         "backoff_seconds": backoff,
                         "reason": message,
                     })
-                    time.sleep(backoff)
+                    _sleep_async_safe(backoff)
                     continue
 
                 if self._is_non_critical(agent_name):

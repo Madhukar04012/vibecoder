@@ -1,5 +1,6 @@
 """Tests for Token Ledger with Budget Enforcement."""
 
+from decimal import Decimal
 import pytest
 from backend.engine.token_ledger import TokenLedger, BudgetExceededError
 
@@ -13,7 +14,7 @@ class TestTokenLedger:
     def test_record_usage(self):
         self.ledger.record("pm", input_tokens=100, output_tokens=50, cost=0.01)
         assert self.ledger.total_tokens == 150
-        assert self.ledger.total_cost == 0.01
+        assert self.ledger.total_cost == Decimal("0.01")
     
     def test_by_agent(self):
         self.ledger.record("pm", cost=0.01)
@@ -63,9 +64,9 @@ class TestBudgetEnforcement:
         with pytest.raises(BudgetExceededError) as exc_info:
             self.ledger.record("pm", cost=0.10)  # Would total 0.15 > 0.10
         
-        assert exc_info.value.budget == 0.10
-        assert exc_info.value.current_cost == 0.05
-        assert exc_info.value.attempted_cost == 0.10
+        assert exc_info.value.budget == Decimal("0.10")
+        assert exc_info.value.current_cost == Decimal("0.05")
+        assert exc_info.value.attempted_cost == Decimal("0.10")
     
     def test_budget_not_exceeded_at_exact_limit(self):
         """Recording exactly up to budget should work."""

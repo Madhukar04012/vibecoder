@@ -9,7 +9,6 @@ import { useEffect, useState } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { cn } from '@/lib/utils';
 import { AtomsChatPanel } from '@/components/AtomsChatPanel';
-import { AgentChat } from '@/components/AgentChat';
 import FilePanel from '@/components/layout/FilePanel';
 import { EditorPanel } from '@/components/editor/EditorPanel';
 import { Code2, Eye, Globe } from 'lucide-react';
@@ -20,11 +19,9 @@ import { useEventBus } from '@/lib/event-bus';
 import { installIdeAPI, uninstallIdeAPI } from '@/lib/ide-bridge';
 
 type ViewMode = 'editor' | 'viewer';
-type ChatMode = 'atoms' | 'agents';
 
 export default function NovaIDE() {
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
-  const [chatMode, setChatMode] = useState<ChatMode>('agents');
   const previewUrl = useAtmosStore((s) => s.previewUrl);
   const phase = useAtmosStore((s) => s.phase);
 
@@ -58,27 +55,8 @@ export default function NovaIDE() {
             {/* Chat Panel */}
             <Panel id="atmos-chat" defaultSize={35} minSize={"320px"}>
               <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'var(--ide-chat-bg)', borderRight: '1px solid var(--ide-border)', zIndex: 10 }}>
-                <div className="shrink-0 flex p-1 gap-1 rounded-lg" style={{ background: 'var(--ide-bg)', margin: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => setChatMode('atoms')}
-                    className={cn('flex-1 px-3 py-1.5 text-[12px] rounded-md transition-colors', chatMode === 'atoms' ? 'font-medium' : '')}
-                    style={{ background: chatMode === 'atoms' ? 'var(--ide-surface-hover)' : 'transparent', color: chatMode === 'atoms' ? 'var(--ide-text)' : 'var(--ide-text-muted)' }}
-                  >
-                    Atoms
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChatMode('agents')}
-                    className={cn('flex-1 px-3 py-1.5 text-[12px] rounded-md transition-colors', chatMode === 'agents' ? 'font-medium' : '')}
-                    style={{ background: chatMode === 'agents' ? 'var(--ide-surface-hover)' : 'transparent', color: chatMode === 'agents' ? 'var(--ide-text)' : 'var(--ide-text-muted)' }}
-                  >
-                    Agents
-                  </button>
-                </div>
                 <div className="flex-1 min-h-0 overflow-hidden">
-                  {chatMode === 'atoms' && <AtomsChatPanel embedded />}
-                  {chatMode === 'agents' && <AgentChat />}
+                  <AtomsChatPanel embedded />
                 </div>
               </div>
             </Panel>

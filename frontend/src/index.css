@@ -195,6 +195,56 @@ body {
   font-family: 'Permanent Marker', cursive;
 }
 
+/* Document viewer prose styles */
+.prose-doc {
+  color: #d1d5db;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.prose-doc h1 { font-size: 1.75rem; font-weight: 700; color: #f9fafb; margin: 1.5rem 0 0.75rem; border-bottom: 1px solid #374151; padding-bottom: 0.5rem; }
+.prose-doc h2 { font-size: 1.375rem; font-weight: 600; color: #f3f4f6; margin: 1.25rem 0 0.6rem; }
+.prose-doc h3 { font-size: 1.125rem; font-weight: 600; color: #e5e7eb; margin: 1rem 0 0.5rem; }
+.prose-doc h4 { font-size: 1rem; font-weight: 600; color: #d1d5db; margin: 0.75rem 0 0.4rem; }
+
+.prose-doc p { margin: 0.5rem 0; }
+
+.prose-doc li { margin: 0.25rem 0 0.25rem 1.5rem; list-style: disc; }
+
+.prose-doc strong { color: #f9fafb; font-weight: 600; }
+.prose-doc em { font-style: italic; color: #e5e7eb; }
+
+.prose-doc code {
+  background: #1f2937;
+  color: #86efac;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.85em;
+}
+
+.prose-doc pre {
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.prose-doc pre code {
+  background: transparent;
+  padding: 0;
+  color: #e5e7eb;
+  font-size: 0.875em;
+}
+
+.prose-doc hr {
+  border: none;
+  border-top: 1px solid #374151;
+  margin: 1.5rem 0;
+}
+
 @keyframes shine {
   0% {
     transform: translateX(-100%);
@@ -241,4 +291,30 @@ body {
   50% {
     transform: translateY(-4px);
   }
+}
+
+/* Live coding — blinking cursor */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Thinking lines — fade + slide in */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out both;
 }
