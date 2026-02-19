@@ -1,0 +1,5 @@
+install: pnpm install
+dev: pnpm run dev
+build: pnpm run build
+build_path: dist
+post_build: node seo-scripts/build.js

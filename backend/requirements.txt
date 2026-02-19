@@ -10,3 +10,11 @@ requests
 psycopg2-binary
 alembic
 pytest
+pytest-asyncio>=0.21.0
+openai>=1.0.0
+anthropic>=0.39.0
+slowapi>=0.1.9
+
+# Phase-1: Agent Observability & Intelligence
+faiss-cpu>=1.7.4
+numpy>=1.24.0

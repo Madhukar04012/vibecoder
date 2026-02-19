@@ -152,9 +152,35 @@ class BackendEngineerAgent:
             return self._generate_generic_module(project_id, task.title)
 
     def _generate_backend_setup(self, project_id: str, architecture: dict) -> Dict[str, Any]:
-        """Generate basic FastAPI project structure."""
+        """Generate S-class FastAPI project structure."""
         project_name = f"project_{project_id[:8]}"
         
+        # Try S-class templates first
+        try:
+            from backend.templates.sclass_templates import get_sclass_backend_templates
+            sclass_files = get_sclass_backend_templates()
+            
+            # Organize into nested structure
+            backend = {}
+            for path, content in sclass_files.items():
+                parts = path.replace("\\", "/").split("/")
+                current = backend
+                for part in parts[:-1]:
+                    current = current.setdefault(part, {})
+                current[parts[-1]] = content
+            
+            structure = {project_name: {"backend": backend}}
+            result = build_project(structure, f"./generated/{project_id}")
+            return {
+                "action": "backend_setup_sclass",
+                "files_created": result.get("total_files", 0),
+                "output_dir": result.get("output_dir", ""),
+                "quality": result.get("quality", {}),
+            }
+        except ImportError:
+            pass
+        
+        # Fallback to legacy templates
         structure = {
             project_name: {
                 "backend": {

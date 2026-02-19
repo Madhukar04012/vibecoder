@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getMe, type UserResponse } from "@/api/auth";
 
 export default function Dashboard() {
-  const { theme, toggleTheme } = useTheme();
+  const { resolvedTheme, toggleTheme } = useTheme();
   const { logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [user, setUser] = useState<UserResponse | null>(null);
@@ -49,7 +49,7 @@ export default function Dashboard() {
       <div
         className={cn(
           "pointer-events-none fixed inset-0 z-[2]",
-          theme === "dark"
+          resolvedTheme === "dark"
             ? "bg-gradient-to-b from-black/40 via-zinc-900/20 to-black/50"
             : "bg-gradient-to-b from-white/40 via-zinc-100/20 to-white/50"
         )}
@@ -59,9 +59,9 @@ export default function Dashboard() {
         to="/"
         aria-label="Back to home"
         className={cn(
-          "fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-lg",
-          "backdrop-blur-md border transition-colors",
-          theme === "dark"
+          "fixed top-[max(1rem,env(safe-area-inset-top))] left-4 sm:left-6 z-50 flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg",
+          "backdrop-blur-md border transition-colors min-h-[44px] touch-manipulation",
+          resolvedTheme === "dark"
             ? "bg-white/10 hover:bg-white/20 border-white/20 text-white"
             : "bg-black/5 hover:bg-black/10 border-gray-200 text-gray-900"
         )}
@@ -75,25 +75,25 @@ export default function Dashboard() {
         size="icon"
         onClick={toggleTheme}
         className={cn(
-          "fixed top-6 right-6 z-50 rounded-full backdrop-blur-lg",
-          theme === "dark"
+          "fixed top-[max(1rem,env(safe-area-inset-top))] right-4 sm:right-6 z-50 rounded-full backdrop-blur-lg h-10 w-10 touch-manipulation",
+          resolvedTheme === "dark"
             ? "bg-black/30 border-white/10 hover:bg-black/40"
             : "bg-white/80 border-gray-200/80 hover:bg-white"
         )}
-        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        aria-label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
       >
-        {theme === "dark" ? (
+        {resolvedTheme === "dark" ? (
           <Sun className="w-4 h-4 text-white" />
         ) : (
           <Moon className="w-4 h-4 text-gray-700" />
         )}
       </Button>
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 py-20 sm:py-0">
         <Card
           className={cn(
-            "w-full max-w-md backdrop-blur",
-            theme === "dark"
+            "w-full max-w-md backdrop-blur mx-auto",
+            resolvedTheme === "dark"
               ? "bg-zinc-900/95 border-zinc-800"
               : "bg-white/95 border-zinc-200"
           )}
@@ -102,14 +102,14 @@ export default function Dashboard() {
             <CardTitle
               className={cn(
                 "text-2xl flex items-center gap-2",
-                theme === "dark" ? "text-white" : "text-gray-900"
+                resolvedTheme === "dark" ? "text-white" : "text-gray-900"
               )}
             >
               <CheckCircle2 className="w-7 h-7 text-green-500" />
               Dashboard
             </CardTitle>
             <CardDescription
-              className={theme === "dark" ? "text-zinc-400" : "text-gray-500"}
+              className={resolvedTheme === "dark" ? "text-zinc-400" : "text-gray-500"}
             >
               {loading ? "Loading..." : error ? "Error loading profile" : "You're logged in successfully"}
             </CardDescription>
@@ -126,7 +126,7 @@ export default function Dashboard() {
               <div
                 className={cn(
                   "rounded-lg px-4 py-3 text-sm",
-                  theme === "dark" ? "bg-red-500/20 text-red-400" : "bg-red-50 text-red-600"
+                  resolvedTheme === "dark" ? "bg-red-500/20 text-red-400" : "bg-red-50 text-red-600"
                 )}
               >
                 {error}
@@ -137,7 +137,7 @@ export default function Dashboard() {
               <div
                 className={cn(
                   "rounded-lg px-4 py-3 space-y-1",
-                  theme === "dark" ? "bg-zinc-800/80" : "bg-gray-50"
+                  resolvedTheme === "dark" ? "bg-zinc-800/80" : "bg-gray-50"
                 )}
               >
                 <p className="text-sm font-medium">
@@ -145,24 +145,24 @@ export default function Dashboard() {
                 </p>
                 <p className={cn(
                   "text-sm",
-                  theme === "dark" ? "text-zinc-400" : "text-gray-500"
+                  resolvedTheme === "dark" ? "text-zinc-400" : "text-gray-500"
                 )}>
                   {user.email}
                 </p>
               </div>
             )}
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 min-h-[44px] touch-manipulation"
                 onClick={handleLogout}
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Log out
               </Button>
-              <Link to="/">
-                <Button className="flex-1">
+              <Link to="/" className="flex-1">
+                <Button className="w-full min-h-[44px] touch-manipulation">
                   <Home className="w-4 h-4 mr-2" />
                   Go to app
                 </Button>

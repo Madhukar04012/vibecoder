@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, Sun, Moon } from "lucide-react";
@@ -258,7 +256,7 @@ export function AnimatedAuthLayout({
         size="icon"
         onClick={toggleTheme}
         className={cn(
-          "fixed top-6 right-6 z-50 rounded-full backdrop-blur-lg",
+          "fixed top-[max(1rem,env(safe-area-inset-top))] right-4 sm:right-6 z-50 rounded-full backdrop-blur-lg h-10 w-10 touch-manipulation",
           theme === "dark"
             ? "bg-black/30 border-white/10 hover:bg-black/40 text-white"
             : "bg-white/80 border-gray-200/80 hover:bg-white text-gray-700"
@@ -472,11 +470,11 @@ export function AnimatedAuthLayout({
       </div>
 
       {/* Right Section - Form content */}
-      <div className="flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-[420px]">
+      <div className="flex items-center justify-center p-4 sm:p-6 md:p-8 bg-background min-h-screen">
+        <div className="w-full max-w-[420px] py-8 sm:py-0">
           <Link
             to="/"
-            className="lg:hidden flex items-center justify-center gap-2 text-lg font-semibold mb-12 hover:opacity-90 transition-opacity"
+            className="lg:hidden flex items-center justify-center gap-2 text-lg font-semibold mb-8 sm:mb-12 hover:opacity-90 transition-opacity touch-manipulation"
             aria-label="Go to home"
           >
             <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">

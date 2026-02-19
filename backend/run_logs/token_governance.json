@@ -1,0 +1,14 @@
+{
+  "2026-02-15": {
+    "anonymous-api": {
+      "tier": "enterprise",
+      "spent_usd": 0.0
+    }
+  },
+  "2026-02-16": {
+    "anonymous-api": {
+      "tier": "enterprise",
+      "spent_usd": "0.000000"
+    }
+  }
+}

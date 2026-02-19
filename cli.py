@@ -43,6 +43,9 @@ def main():
     gen_parser.add_argument("--skip-tests", action="store_true", help="Skip test generation")
     gen_parser.add_argument("--no-docker", action="store_true", help="Skip Docker/deployment files")
     gen_parser.add_argument("--v1", action="store_true", help="Use legacy v1 pipeline (backward compat)")
+    gen_parser.add_argument("--tier", default="free", help="Token tier: free | pro | enterprise")
+    gen_parser.add_argument("--project-id", default=None, help="Optional stable project key for artifact history")
+    gen_parser.add_argument("--memory-scope", default="project", help="Memory scope: project | user | global")
     
     # ============ RUN COMMAND ============
     run_parser = subparsers.add_parser("run", help="Run an agent on a project")
@@ -90,7 +93,8 @@ def main():
 # ============ GENERATE HANDLER ============
 def handle_generate(args):
     """Generate a new project from idea"""
-    from backend.core.orchestrator import orchestrate, run_agents
+    from backend.core.orchestrator import run_agents
+    from backend.core.pipeline_runner import PipelineRequest, run_pipeline
     from backend.generator.project_builder import build_project
     
     # Determine mode
@@ -112,8 +116,17 @@ def handle_generate(args):
     
     if use_v2:
         # Phase 2: Team Lead Brain
-        result = orchestrate(args.idea, mode=mode, use_v2=True)
-        
+        pipeline_request = PipelineRequest(
+            idea=args.idea,
+            mode=mode,
+            channel="cli",
+            user_id="local-cli",
+            project_id=args.project_id,
+            token_tier=args.tier,
+            memory_scope=args.memory_scope,
+        )
+        result = run_pipeline(pipeline_request)
+
         # Display execution plan
         plan = result.get("execution_plan", {})
         print(f"\n[EXECUTION PLAN]")
@@ -168,6 +181,15 @@ def handle_generate(args):
         if "coder" in outputs:
             print(f"\n[PROJECT STRUCTURE]")
             print_structure(outputs["coder"], indent=3)
+
+        print(f"\n[RUN STATE]")
+        print(f"   Final state: {result.get('state', 'unknown')}")
+        print(f"   Run ID: {result.get('run_id', 'n/a')}")
+        print(f"   Cost (USD): {result.get('cost', {}).get('total_usd', 0.0)}")
+        budget_post = result.get("budget", {}).get("post_run", {})
+        if budget_post:
+            print(f"   Tier: {budget_post.get('tier', args.tier)}")
+            print(f"   Remaining daily budget: {budget_post.get('remaining_usd', 'unlimited')}")
         
     else:
         # Legacy v1 pipeline

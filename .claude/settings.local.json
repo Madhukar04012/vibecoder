@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(alembic init:*)",
+      "Bash(alembic revision:*)",
+      "Bash(pip install:*)",
+      "Bash(npm install:*)",
+      "Bash(python -c:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run typecheck:*)"
+    ]
+  }
+}

@@ -8,7 +8,7 @@ Deterministic. No AI. Pure templates.
 """
 
 from typing import Dict, Any, List, Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 # ========== TYPES ==========
@@ -168,13 +168,12 @@ class UserLogin(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     email: str
     name: str
     is_active: bool
-
-    class Config:
-        from_attributes = True
 
 
 class Token(BaseModel):

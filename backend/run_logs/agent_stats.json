@@ -1,0 +1,25 @@
+{
+  "updated_at": "2026-02-16T13:56:17.173665+00:00",
+  "agents": {
+    "planner": {
+      "runs": 4,
+      "failures": 0,
+      "total_duration_ms": 275.506,
+      "avg_duration_ms": 68.876,
+      "last_status": "success",
+      "failure_rate": 0.0,
+      "last_error": null,
+      "last_updated": "2026-02-16T13:56:17.164410+00:00"
+    },
+    "coder": {
+      "runs": 4,
+      "failures": 0,
+      "total_duration_ms": 20.794,
+      "avg_duration_ms": 5.199,
+      "last_status": "success",
+      "failure_rate": 0.0,
+      "last_error": null,
+      "last_updated": "2026-02-16T13:56:17.173652+00:00"
+    }
+  }
+}

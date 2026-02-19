@@ -6,7 +6,7 @@ import * as THREE from 'three';
 type DottedSurfaceProps = Omit<React.ComponentProps<'div'>, 'ref'>;
 
 export function DottedSurface({ className, children, ...props }: DottedSurfaceProps) {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const animationIdRef = useRef<number>(0);
   const sceneRef = useRef<{
@@ -25,7 +25,7 @@ export function DottedSurface({ className, children, ...props }: DottedSurfacePr
     const AMOUNTY = 60;
 
     const scene = new THREE.Scene();
-    const fogColor = theme === 'dark' ? 0x0f172a : 0xf8fafc;
+    const fogColor = resolvedTheme === 'dark' ? 0x0f172a : 0xf8fafc;
     scene.fog = new THREE.Fog(fogColor, 2000, 10000);
 
     const camera = new THREE.PerspectiveCamera(
@@ -60,7 +60,7 @@ export function DottedSurface({ className, children, ...props }: DottedSurfacePr
         const x = ix * SEPARATION - (AMOUNTX * SEPARATION) / 2;
         const z = iy * SEPARATION - (AMOUNTY * SEPARATION) / 2;
         positions.push(x, 0, z);
-        theme === 'dark'
+        resolvedTheme === 'dark'
           ? colors.push(220, 220, 220)
           : colors.push(0, 0, 0);
       }
@@ -143,7 +143,7 @@ export function DottedSurface({ className, children, ...props }: DottedSurfacePr
         sceneRef.current = null;
       }
     };
-  }, [theme]);
+  }, [resolvedTheme]);
 
   return (
     <div

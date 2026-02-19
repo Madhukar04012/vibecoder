@@ -2,6 +2,36 @@
 
 All notable changes to VibeCober.
 
+## [Unreleased]
+
+### Changed
+
+- **LLM pipeline**: Ollama removed; all LLM calls use NVIDIA NIM / DeepSeek only. Set `NIM_API_KEY` and `NIM_MODEL` in `.env`.
+- **.env.example**: Removed `OLLAMA_PATH`; pipeline is NIM/DeepSeek only.
+
+---
+
+## [0.6.2] - 2026-02-09
+
+### Removed (Dead Code & Unused Assets)
+
+- **Frontend**: Removed unused components: `SidebarDemo`, `AtomsSidebar`, `AtomsHoverSidebar`, `AtomsAgentTimeline`, `AtomsFileExplorer`, `AtomsQuickOpen`, `FileTree`, `sidebar.tsx`, `App.tsx`
+- **Frontend**: Removed unused libs: `agent-engine/`, `workspace-context.ts`, `ide-config.ts`
+- **Frontend**: Removed unused hooks & data: `useIDEUser.ts`, `data/fileTree.ts`
+- **Frontend**: Removed `allotment` package and `allotment-overrides.css` (replaced by `react-resizable-panels`)
+
+### Fixed
+
+- **run_backend.py**: Uses `sys.executable` instead of hardcoded path (portable across machines)
+- **LOGIN_GUIDE.md**: Removed personal email references; sanitized for sharing
+
+### Changed
+
+- **.gitignore**: Added `*.tsbuildinfo` for TypeScript build artifacts
+- **COMPONENT_MAP.md**: Updated to reflect current component inventory
+
+---
+
 ## [0.3.1] - 2026-02-06
 
 ### Fixed

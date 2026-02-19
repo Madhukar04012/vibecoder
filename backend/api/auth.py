@@ -17,22 +17,29 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 def _create_user(user_data: UserCreate, db: Session) -> User:
-    """Shared logic for user creation"""
+    """Shared logic for user creation."""
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="Email already registered",
         )
     user = User(
         email=user_data.email,
         password_hash=hash_password(user_data.password),
-        name=user_data.name
+        name=user_data.name,
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed. Please try again.",
+        )
 
 
 @router.post("/signup", response_model=UserResponse)

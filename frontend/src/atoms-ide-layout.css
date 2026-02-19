@@ -1,0 +1,39 @@
+/**
+ * VibeCober IDE — Dark theme tokens
+ */
+
+:root {
+  /* Core colors */
+  --atoms-deep-black: #0a0a0a;
+  --atoms-charcoal: #111111;
+  --atoms-charcoal-light: #1a1a1a;
+  --atoms-pearl-white: #e5e5e5;
+  --atoms-pearl-white-muted: #9a9a9a;
+
+  /* Top bar */
+  --atoms-topbar-height: 42px;
+  --atoms-topbar-bg: #111111;
+  --atoms-topbar-border: #1e1e1e;
+
+  --atoms-text-primary: #e5e5e5;
+  --atoms-text-muted: #9a9a9a;
+
+  /* Sidebar */
+  --atoms-sidebar-bg: #111111;
+  --atoms-sidebar-border: #1e1e1e;
+
+  /* Editor */
+  --atoms-editor-bg: #0d0d0d;
+
+  /* Input */
+  --atoms-input-bg: #1a1a1a;
+
+  /* Accents */
+  --atoms-accent-blue: #2563eb;
+  --atoms-accent-emerald: #10b981;
+}
+
+.atoms-header {
+  height: 42px;
+  padding: 0 8px;
+}

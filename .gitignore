@@ -32,8 +32,12 @@ Thumbs.db
 
 # Generated files
 generated/
+generated_projects/
 output/
 demo_*.txt
+
+# Reference / vendored code (optional; not used by app)
+project/
 
 # Node (for frontend)
 node_modules/
@@ -47,5 +51,14 @@ node_modules/
 .coverage
 htmlcov/
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Keep .env.example but ignore .env
 !.env.example
+
+# Frontend build
+frontend/dist/
+
+# Debug / Cursor
+.cursor/debug.log

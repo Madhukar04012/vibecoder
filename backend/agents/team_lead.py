@@ -10,7 +10,7 @@ from backend.models.project import Project
 from backend.models.project_agent import ProjectAgent
 from backend.models.conversation import Conversation
 from backend.models.project_plan import ProjectPlan
-from backend.core.llm_client import call_ollama
+from backend.core.llm_client import call_llm  # call_ollama is an alias in llm_client for backward compat
 from backend.schemas.team_lead import TeamLeadResponse, PlanOutput, TechStack, ClarificationQuestion
 
 
@@ -126,7 +126,7 @@ Output ONLY valid JSON in this exact structure:
   "assumptions": ["list of assumptions"]
 }}
 """
-        response = call_ollama(prompt)
+        response = call_llm(prompt)
         
         if not response:
             raise ValueError("Empty AI response")

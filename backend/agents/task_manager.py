@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from backend.models.task import Task
 from backend.models.project_plan import ProjectPlan
 from backend.models.enums import TaskPriority, TaskStatus, AgentRole
-from backend.core.llm_client import call_ollama
+from backend.core.llm_client import call_llm
 
 
 class TaskManagerAgent:
@@ -79,12 +79,12 @@ Project Architecture:
 {json.dumps(architecture, indent=2)}
 """
 
-        response = call_ollama(prompt)
+        response = call_llm(prompt)
         
         if response is None:
             raise ValueError("Empty AI response")
 
-        # call_ollama returns parsed JSON, but we need to handle array format
+        # call_llm returns parsed JSON when possible, but we need to handle array format
         tasks = self._parse_llm_response(response)
 
         if not tasks:
@@ -97,7 +97,7 @@ Project Architecture:
         Parse LLM response into task list.
         Handles both direct list and dict with tasks key.
         """
-        # If call_ollama already parsed as list
+        # If call_llm already parsed as list
         if isinstance(response, list):
             return response
         

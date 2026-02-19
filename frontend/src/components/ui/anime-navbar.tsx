@@ -17,8 +17,8 @@ interface NavBarProps {
 }
 
 export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBarProps) {
-  const { theme } = useTheme();
-  const isLight = theme === 'light';
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
   const [mounted, setMounted] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>(defaultActive);
@@ -41,11 +41,11 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
   if (!mounted) return null;
 
   return (
-    <div className={cn('fixed top-5 left-0 right-0 z-[9999] pointer-events-none', className)}>
-      <div className="flex justify-center pt-6">
+    <div className={cn('fixed left-0 right-0 z-[9999] pointer-events-none', 'top-[max(1rem,env(safe-area-inset-top))]', className)}>
+      <div className="flex justify-center pt-4 sm:pt-6 px-2 sm:px-4">
         <motion.div
           className={cn(
-            'flex items-center gap-3 backdrop-blur-lg py-2 px-2 rounded-full shadow-lg relative pointer-events-auto',
+            'flex items-center gap-1.5 sm:gap-3 backdrop-blur-lg py-1.5 sm:py-2 px-1.5 sm:px-2 rounded-full shadow-lg relative pointer-events-auto touch-manipulation',
             isLight
               ? 'bg-white/80 border border-gray-200/80'
               : 'bg-black/50 border border-white/10'
@@ -78,7 +78,7 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                 onMouseEnter={() => setHoveredTab(item.name)}
                 onMouseLeave={() => setHoveredTab(null)}
                 className={cn(
-                  'relative cursor-pointer text-sm font-semibold px-6 py-3 rounded-full transition-all duration-300',
+                  'relative cursor-pointer text-sm font-semibold px-4 sm:px-6 py-2.5 sm:py-3 rounded-full transition-all duration-300 min-h-[44px] sm:min-h-0 flex items-center justify-center',
                   isLight
                     ? 'text-gray-600 hover:text-gray-900'
                     : 'text-white/70 hover:text-white',
@@ -161,21 +161,21 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                         animate={
                           hoveredTab
                             ? {
-                                scale: [1, 1.1, 1],
-                                rotate: [0, -5, 5, 0],
-                                transition: {
-                                  duration: 0.5,
-                                  ease: 'easeInOut',
-                                },
-                              }
+                              scale: [1, 1.1, 1],
+                              rotate: [0, -5, 5, 0],
+                              transition: {
+                                duration: 0.5,
+                                ease: 'easeInOut',
+                              },
+                            }
                             : {
-                                y: [0, -3, 0],
-                                transition: {
-                                  duration: 2,
-                                  repeat: Infinity,
-                                  ease: 'easeInOut',
-                                },
-                              }
+                              y: [0, -3, 0],
+                              transition: {
+                                duration: 2,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                              },
+                            }
                         }
                       >
                         <motion.div
@@ -183,12 +183,12 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                           animate={
                             hoveredTab
                               ? {
-                                  scaleY: [1, 0.2, 1],
-                                  transition: {
-                                    duration: 0.2,
-                                    times: [0, 0.5, 1],
-                                  },
-                                }
+                                scaleY: [1, 0.2, 1],
+                                transition: {
+                                  duration: 0.2,
+                                  times: [0, 0.5, 1],
+                                },
+                              }
                               : {}
                           }
                           style={{ left: '25%', top: '40%' }}
@@ -198,12 +198,12 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                           animate={
                             hoveredTab
                               ? {
-                                  scaleY: [1, 0.2, 1],
-                                  transition: {
-                                    duration: 0.2,
-                                    times: [0, 0.5, 1],
-                                  },
-                                }
+                                scaleY: [1, 0.2, 1],
+                                transition: {
+                                  duration: 0.2,
+                                  times: [0, 0.5, 1],
+                                },
+                              }
                               : {}
                           }
                           style={{ right: '25%', top: '40%' }}
@@ -228,13 +228,13 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                           animate={
                             hoveredTab
                               ? {
-                                  scaleY: 1.5,
-                                  y: -1,
-                                }
+                                scaleY: 1.5,
+                                y: -1,
+                              }
                               : {
-                                  scaleY: 1,
-                                  y: 0,
-                                }
+                                scaleY: 1,
+                                y: 0,
+                              }
                           }
                           style={{ left: '30%', top: '60%' }}
                         />
@@ -267,22 +267,22 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
                         animate={
                           hoveredTab
                             ? {
-                                y: [0, -4, 0],
-                                transition: {
-                                  duration: 0.3,
-                                  repeat: Infinity,
-                                  repeatType: 'reverse',
-                                },
-                              }
+                              y: [0, -4, 0],
+                              transition: {
+                                duration: 0.3,
+                                repeat: Infinity,
+                                repeatType: 'reverse',
+                              },
+                            }
                             : {
-                                y: [0, 2, 0],
-                                transition: {
-                                  duration: 1,
-                                  repeat: Infinity,
-                                  ease: 'easeInOut',
-                                  delay: 0.5,
-                                },
-                              }
+                              y: [0, 2, 0],
+                              transition: {
+                                duration: 1,
+                                repeat: Infinity,
+                                ease: 'easeInOut',
+                                delay: 0.5,
+                              },
+                            }
                         }
                       >
                         <div

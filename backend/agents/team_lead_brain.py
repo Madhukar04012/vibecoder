@@ -10,6 +10,8 @@ Does NOT execute agents. Only outputs JSON execution plans.
 """
 
 from typing import List, Dict, Literal
+import os
+import re
 from pydantic import BaseModel
 from enum import Enum
 
@@ -39,6 +41,7 @@ class ProjectAnalysis(BaseModel):
     needs_tests: bool
     needs_deployment: bool
     risk_level: Literal["low", "medium", "high"]
+    routing_source: Literal["keyword", "llm"] = "keyword"
 
 
 class ExecutionConfig(BaseModel):
@@ -70,6 +73,7 @@ class TeamLeadBrain:
         "db_schema",
         "auth",
         "coder",
+        "code_reviewer",
         "tester",
         "deployer"
     }
@@ -80,12 +84,14 @@ class TeamLeadBrain:
         "db_schema": ["planner"],
         "auth": ["db_schema"],  # Auth needs db_schema (user table)
         "coder": ["planner"],
+        "code_reviewer": ["coder"],  # Review code after generation
         "tester": ["coder"],
         "deployer": ["tester"]
     }
     
     def __init__(self, mode: Literal["simple", "full", "production"] = "full"):
         self.mode = mode
+        self._allow_llm_routing = os.getenv("TEAM_LEAD_LLM_ROUTING", "true").lower() == "true"
     
     def decide(self, user_idea: str) -> ExecutionPlan:
         """
@@ -126,18 +132,24 @@ class TeamLeadBrain:
         idea_lower = idea.lower()
         
         # Determine project type
-        if any(word in idea_lower for word in ["saas", "subscription", "payment"]):
-            project_type = ProjectType.SAAS
-        elif any(word in idea_lower for word in ["api", "rest", "graphql", "endpoint"]):
-            project_type = ProjectType.API
-        elif any(word in idea_lower for word in ["dashboard", "admin", "analytics"]):
-            project_type = ProjectType.DASHBOARD
-        elif any(word in idea_lower for word in ["ai", "ml", "llm", "chatbot"]):
-            project_type = ProjectType.AI_APP
-        elif any(word in idea_lower for word in ["landing", "marketing", "website"]):
-            project_type = ProjectType.LANDING_PAGE
+        matches = {
+            ProjectType.SAAS: self._has_any(idea_lower, ["saas", "subscription", "payment", "billing"]),
+            ProjectType.API: self._has_any(idea_lower, ["api", "rest", "graphql", "endpoint", "webhook"]),
+            ProjectType.DASHBOARD: self._has_any(idea_lower, ["dashboard", "admin", "analytics", "metrics"]),
+            ProjectType.AI_APP: self._has_any(idea_lower, ["ai", "ml", "llm", "chatbot", "agent"]),
+            ProjectType.LANDING_PAGE: self._has_any(idea_lower, ["landing", "marketing", "website"]),
+        }
+        matched_types = [ptype for ptype, hit in matches.items() if hit]
+
+        routing_source: Literal["keyword", "llm"] = "keyword"
+        if len(matched_types) == 1:
+            project_type = matched_types[0]
+        elif self._is_ambiguous(idea_lower, matched_types):
+            project_type = self._classify_with_llm(idea) or (matched_types[0] if matched_types else ProjectType.CRUD)
+            if project_type in (ProjectType.SAAS, ProjectType.API, ProjectType.DASHBOARD, ProjectType.AI_APP, ProjectType.LANDING_PAGE, ProjectType.CRUD):
+                routing_source = "llm" if project_type != (matched_types[0] if matched_types else ProjectType.CRUD) or not matched_types else "keyword"
         else:
-            project_type = ProjectType.CRUD
+            project_type = matched_types[0] if matched_types else ProjectType.CRUD
         
         # Determine complexity (based on keyword count and features)
         complexity_score = 0
@@ -183,8 +195,66 @@ class TeamLeadBrain:
             needs_database=needs_database,
             needs_tests=needs_tests,
             needs_deployment=needs_deployment,
-            risk_level=risk_level
+            risk_level=risk_level,
+            routing_source=routing_source,
         )
+
+    @staticmethod
+    def _has_any(text: str, terms: List[str]) -> bool:
+        return any(term in text for term in terms)
+
+    def _is_ambiguous(self, idea_lower: str, matched_types: List[ProjectType]) -> bool:
+        if len(matched_types) == 0:
+            return len(idea_lower.split()) > 3
+        if len(matched_types) > 1:
+            return True
+        # Single weak match with uncertain intent
+        weak_terms = {"website", "app", "platform", "tool", "system"}
+        tokens = set(re.findall(r"[a-zA-Z]+", idea_lower))
+        return bool(tokens & weak_terms) and len(tokens) <= 8
+
+
+    def _classify_with_llm(self, idea: str) -> ProjectType | None:
+        """Fallback classifier for ambiguous routing."""
+        if not self._allow_llm_routing:
+            return None
+
+        has_remote_key = bool(os.getenv("NIM_API_KEY", "").strip())
+        if not has_remote_key:
+            return None
+
+        try:
+            from backend.engine.llm_gateway import llm_call_simple
+        except Exception:
+            return None
+
+        response = llm_call_simple(
+            agent_name="team_lead_brain",
+            system=(
+                "Classify product intent into exactly one label: "
+                "saas, crud, api, dashboard, ai_app, landing_page. "
+                "Reply with label only."
+            ),
+            user=f"Idea: {idea}",
+            max_tokens=16,
+            temperature=0.0,
+        )
+        if not response:
+            return None
+
+        label = response.strip().lower().replace("-", "_")
+        aliases = {
+            "saas": ProjectType.SAAS,
+            "crud": ProjectType.CRUD,
+            "api": ProjectType.API,
+            "dashboard": ProjectType.DASHBOARD,
+            "ai_app": ProjectType.AI_APP,
+            "ai": ProjectType.AI_APP,
+            "landing_page": ProjectType.LANDING_PAGE,
+            "landing": ProjectType.LANDING_PAGE,
+            "website": ProjectType.LANDING_PAGE,
+        }
+        return aliases.get(label)
     
     def select_agents(self, analysis: ProjectAnalysis) -> List[str]:
         """
@@ -211,6 +281,10 @@ class TeamLeadBrain:
         
         # Coder - always needed
         agents.append("coder")
+        
+        # Code reviewer - quality gate for full and production modes
+        if self.mode in ("full", "production"):
+            agents.append("code_reviewer")
         
         # Tests
         if analysis.needs_tests and self.mode != "simple":

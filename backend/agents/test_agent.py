@@ -13,7 +13,8 @@ from pydantic import BaseModel
 
 # ========== TYPES ==========
 
-class TestOutput(BaseModel):
+class SuiteOutput(BaseModel):
+    """Pydantic model for test suite output (name avoids pytest collection)."""
     framework: str = "pytest"
     tests: List[str]
     requires_test_db: bool = True
@@ -266,10 +267,10 @@ addopts = -v --tb=short
 
 # ========== TEST AGENT ==========
 
-class TestAgent:
+class SuiteGenerator:
     """
     Generates pytest test suite based on auth and db schema.
-    Deterministic template-based generation.
+    Deterministic template-based generation. (Name avoids pytest collection.)
     """
     
     def __init__(self, auth_output: Dict[str, Any], db_schema: Dict[str, Any]):
@@ -277,7 +278,7 @@ class TestAgent:
         self.db_schema = db_schema
         self.has_auth = bool(auth_output.get("auth", {}).get("routes", []))
     
-    def generate(self) -> TestOutput:
+    def generate(self) -> SuiteOutput:
         """Generate complete test suite"""
         files = {}
         tests = []
@@ -296,7 +297,7 @@ class TestAgent:
             files["tests/test_auth.py"] = TEST_AUTH_TEMPLATE.strip()
             tests.append("auth")
         
-        return TestOutput(
+        return SuiteOutput(
             framework="pytest",
             tests=tests,
             requires_test_db=True,
@@ -306,9 +307,9 @@ class TestAgent:
 
 # ========== PUBLIC API ==========
 
-def test_agent(context: Dict[str, Any]) -> Dict[str, Any]:
+def run_test_agent(context: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Main entry point for orchestrator.
+    Main entry point for orchestrator. (Named to avoid pytest collection.)
     
     Args:
         context: Should contain 'auth' and 'db_schema' outputs
@@ -319,7 +320,7 @@ def test_agent(context: Dict[str, Any]) -> Dict[str, Any]:
     auth_output = context.get("auth", {})
     db_schema = context.get("db_schema", {})
     
-    agent = TestAgent(auth_output, db_schema)
+    agent = SuiteGenerator(auth_output, db_schema)
     output = agent.generate()
     
     return {
@@ -344,7 +345,7 @@ if __name__ == "__main__":
         "schema": {"tables": [{"name": "users"}]}
     }
     
-    result = test_agent({"auth": sample_auth, "db_schema": sample_db})
+    result = run_test_agent({"auth": sample_auth, "db_schema": sample_db})
     
     print("=" * 60)
     print("TEST OUTPUT:")
