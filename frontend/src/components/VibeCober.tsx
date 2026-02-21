@@ -346,11 +346,34 @@ const VibeCober: React.FC = () => {
             >
               <h1
                 className={cn(
-                  'text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight mb-4 sm:mb-6',
-                  theme === 'dark' ? 'text-foreground' : 'text-[#333333]'
+                  'text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter mb-4 sm:mb-6 uppercase',
                 )}
               >
-                Vibecoder
+                <span
+                  className={theme === 'dark' ? 'text-white' : 'text-[#1a1a2e]'}
+                >
+                  VIDE
+                </span>
+                <span
+                  style={{
+                    background: 'linear-gradient(135deg, #2D5CFE 0%, #6366f1 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  CO
+                </span>
+                <span
+                  style={{
+                    background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #9333ea 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  DER
+                </span>
               </h1>
               <p
                 className={cn(
@@ -376,64 +399,28 @@ const VibeCober: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="relative mx-auto px-2 sm:px-0"
-              style={{
-                maxWidth: isChatFocused ? '48rem' : '42rem',
-                transition: 'max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}
+              transition={{ duration: 0.7, delay: 0.2 }}
+              className="relative mx-auto w-full px-3 sm:px-0"
+              style={{ maxWidth: '48rem' }}
             >
-              {/* Animated glow behind glass */}
               <div
-                className="absolute -inset-3 sm:-inset-5 rounded-[2rem] pointer-events-none"
-                style={{
-                  background: theme === 'dark'
-                    ? 'radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.08) 40%, transparent 70%)'
-                    : 'radial-gradient(ellipse at 50% 50%, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.05) 40%, transparent 70%)',
-                  filter: 'blur(25px)',
-                  opacity: isChatFocused ? 1 : 0.4,
-                  transform: isChatFocused ? 'scale(1.08)' : 'scale(1)',
-                  transition: 'opacity 0.5s ease, transform 0.5s ease',
-                }}
-              />
-
-              {/* Glass container */}
-              <div
-                className="relative rounded-2xl overflow-hidden cursor-text"
+                className="relative rounded-2xl cursor-text overflow-hidden"
                 onClick={() => {
                   const ta = document.querySelector<HTMLTextAreaElement>('#landing-chat-textarea');
                   ta?.focus();
                 }}
                 style={{
                   background: theme === 'dark'
-                    ? isChatFocused ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.035)'
-                    : isChatFocused ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.55)',
-                  backdropFilter: isChatFocused ? 'blur(32px) saturate(1.4)' : 'blur(20px) saturate(1.1)',
-                  WebkitBackdropFilter: isChatFocused ? 'blur(32px) saturate(1.4)' : 'blur(20px) saturate(1.1)',
+                    ? 'rgba(255,255,255,0.04)'
+                    : 'rgba(255,255,255,0.9)',
                   border: theme === 'dark'
-                    ? isChatFocused ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(255,255,255,0.07)'
-                    : isChatFocused ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(0,0,0,0.06)',
-                  boxShadow: isChatFocused
-                    ? theme === 'dark'
-                      ? '0 0 0 1px rgba(99,102,241,0.2), 0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)'
-                      : '0 0 0 1px rgba(99,102,241,0.15), 0 16px 48px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.9)'
-                    : theme === 'dark'
-                      ? '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)'
-                      : '0 8px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.7)',
-                  transform: isChatFocused ? 'scale(1.02)' : 'scale(1)',
-                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    ? '1px solid rgba(255,255,255,0.08)'
+                    : '1px solid rgba(0,0,0,0.08)',
+                  boxShadow: theme === 'dark'
+                    ? '0 2px 12px rgba(0,0,0,0.2)'
+                    : '0 2px 12px rgba(0,0,0,0.04)',
                 }}
               >
-                {/* Inner top shine */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-                  style={{
-                    background: theme === 'dark'
-                      ? 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)'
-                      : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
-                  }}
-                />
-
                 <Textarea
                   id="landing-chat-textarea"
                   value={idea}
@@ -441,60 +428,55 @@ const VibeCober: React.FC = () => {
                   onFocus={() => setIsChatFocused(true)}
                   onBlur={() => setIsChatFocused(false)}
                   onKeyDown={(e) => {
-                    if (
-                      e.key === 'Enter' &&
-                      !e.shiftKey &&
-                      idea.trim()
-                    ) {
+                    if (e.key === 'Enter' && !e.shiftKey && idea.trim()) {
                       e.preventDefault();
                       handleGenerate();
                     }
                   }}
                   placeholder={placeholder}
                   className={cn(
-                    'border-none bg-transparent focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none touch-manipulation leading-relaxed',
-                    'text-base sm:text-lg px-5 sm:px-6 pt-5 sm:pt-6 pb-3',
-                    'transition-all duration-400',
-                    isChatFocused ? 'min-h-[140px] sm:min-h-[180px]' : 'min-h-[90px] sm:min-h-[110px]',
+                    'border-none bg-transparent focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+                    'resize-none touch-manipulation leading-relaxed',
+                    'text-[15px] sm:text-base px-5 sm:px-6 pt-5 sm:pt-6 pb-3',
+                    'min-h-[100px] sm:min-h-[120px]',
                     theme === 'dark'
-                      ? 'placeholder:text-white/20 text-white/90'
-                      : 'placeholder:text-[#AAAAAA] text-[#333333]'
+                      ? 'placeholder:text-white/25 text-white/90'
+                      : 'placeholder:text-neutral-400 text-neutral-800'
                   )}
                 />
 
                 {/* Bottom bar */}
                 <div
-                  className="flex items-center justify-between px-4 sm:px-5 py-3"
+                  className="flex items-center justify-between px-4 sm:px-5 py-2.5"
                   style={{
                     borderTop: theme === 'dark'
-                      ? '1px solid rgba(255,255,255,0.06)'
-                      : '1px solid rgba(0,0,0,0.05)',
+                      ? '1px solid rgba(255,255,255,0.05)'
+                      : '1px solid rgba(0,0,0,0.04)',
                   }}
                 >
-                  <p
-                    className={cn(
-                      'text-xs font-normal transition-opacity duration-300',
-                      isChatFocused ? 'opacity-60' : 'opacity-40',
-                      theme === 'dark' ? 'text-white/50' : 'text-[#999999]'
-                    )}
-                  >
-                    <kbd className="font-mono text-[10px]">Enter</kbd> to generate · <kbd className="font-mono text-[10px]">Shift+Enter</kbd> new line
+                  <p className={cn(
+                    'text-xs',
+                    theme === 'dark' ? 'text-white/25' : 'text-neutral-400'
+                  )}>
+                    <kbd className="font-mono text-[10px]">↵</kbd> send · <kbd className="font-mono text-[10px]">⇧↵</kbd> new line
                   </p>
                   <Button
                     onClick={handleGenerate}
                     disabled={!idea.trim()}
+                    size="icon"
                     className={cn(
-                      'rounded-xl h-9 px-4 sm:h-10 sm:px-5 text-sm font-medium transition-all duration-300 touch-manipulation',
+                      'rounded-full h-9 w-9 sm:h-10 sm:w-10 transition-colors border-0',
                       idea.trim()
-                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40'
+                        ? theme === 'dark'
+                          ? 'bg-white text-black hover:bg-white/90'
+                          : 'bg-neutral-900 text-white hover:bg-neutral-800'
                         : theme === 'dark'
-                          ? 'bg-white/5 text-white/20 border border-white/5'
-                          : 'bg-black/5 text-black/20 border border-black/5',
+                          ? 'bg-white/[0.06] text-white/20'
+                          : 'bg-neutral-100 text-neutral-300',
                       'disabled:cursor-not-allowed'
                     )}
                   >
-                    Generate
-                    <ArrowRight className="w-4 h-4 ml-1.5" />
+                    <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Button>
                 </div>
               </div>
