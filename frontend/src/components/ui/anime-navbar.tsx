@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,39 @@ interface NavBarProps {
 export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(defaultActive);
   const { theme } = useTheme();
+  const isScrollingToSection = useRef(false);
+
+  useEffect(() => {
+    const observerOptions = {
+      root: null,
+      rootMargin: '-50% 0px -50% 0px', // Detect when middle of section is in view
+      threshold: 0,
+    };
+
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      if (isScrollingToSection.current) return;
+
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const item = items.find((i) => i.url === `#${entry.target.id}`);
+          if (item) {
+            setActiveTab(item.name);
+          }
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+
+    items.forEach((item) => {
+      if (item.url.startsWith('#')) {
+        const el = document.querySelector(item.url);
+        if (el) observer.observe(el);
+      }
+    });
+
+    return () => observer.disconnect();
+  }, [items]);
 
   return (
     <div
@@ -29,10 +62,10 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
     >
       <div
         className={cn(
-          'flex items-center gap-3 border backdrop-blur-lg py-1 px-1 rounded-full shadow-lg',
+          'flex items-center gap-3 border backdrop-blur-xl py-1 px-1 rounded-full shadow-xl',
           theme === 'dark'
-            ? 'bg-white/[0.03] border-white/[0.08]'
-            : 'bg-black/[0.03] border-black/[0.06]',
+            ? 'bg-white/[0.04] border-white/[0.1] shadow-black/20'
+            : 'bg-white/60 border-black/[0.06] shadow-black/5',
         )}
       >
         {items.map((item) => {
@@ -43,7 +76,23 @@ export function AnimeNavBar({ items, className, defaultActive = 'Home' }: NavBar
             <a
               key={item.name}
               href={item.url}
-              onClick={() => setActiveTab(item.name)}
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab(item.name);
+                const hash = item.url;
+                if (hash.startsWith('#')) {
+                  const el = document.querySelector(hash);
+                  if (el) {
+                    isScrollingToSection.current = true;
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                    // Reset scrolling flag after animation
+                    setTimeout(() => {
+                      isScrollingToSection.current = false;
+                    }, 800);
+                  }
+                }
+              }}
               className={cn(
                 'relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors',
                 theme === 'dark'

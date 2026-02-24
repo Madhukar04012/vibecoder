@@ -5,4 +5,113 @@
   --atoms-text-muted: #9a9a9a;
   --atoms-input-bg: #1a1a1a;
   --atoms-hover-bg: #1e1e1e;
+
+  /* Glassmorphism tokens */
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.14);
+  --glass-blur: 20px;
+  --glass-user-bubble: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(139, 92, 246, 0.14));
+  --glass-user-border: rgba(99, 102, 241, 0.25);
+  --glass-ai-bubble: rgba(255, 255, 255, 0.03);
+  --glass-ai-border: rgba(255, 255, 255, 0.06);
+  --glass-input-bg: rgba(255, 255, 255, 0.04);
+  --glass-input-border: rgba(255, 255, 255, 0.1);
+  --glass-input-focus: rgba(99, 102, 241, 0.35);
+  --glass-glow: 0 0 20px rgba(99, 102, 241, 0.12);
 }
+
+/* ─── Glassmorphism utilities ─────────────────────────────────────────────── */
+
+.glass-surface {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+.glass-surface:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+}
+
+.glass-input {
+  background: var(--glass-input-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-input-border);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-input:focus-within {
+  border-color: var(--glass-input-focus);
+  box-shadow: var(--glass-glow), 0 0 0 1px var(--glass-input-focus);
+}
+
+/* ─── Chat scrollbar ─────────────────────────────────────────────────────── */
+
+.chat-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ─── Message bubble animations ──────────────────────────────────────────── */
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-bubble {
+  animation: messageSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Glowing send button ────────────────────────────────────────────────── */
+
+.send-btn-glow {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.35);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.send-btn-glow:hover {
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+  transform: scale(1.05);
+}
+
+.send-btn-glow:active {
+  transform: scale(0.96);
+}
+
+/* ─── Typing dots ────────────────────────────────────────────────────────── */
+
+@keyframes typingPulse {
+  0%, 60%, 100% { opacity: 0.3; transform: scale(0.85); }
+  30% { opacity: 1; transform: scale(1); }
+}
+
+.typing-dot {
+  animation: typingPulse 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }

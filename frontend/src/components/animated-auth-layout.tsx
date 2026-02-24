@@ -469,9 +469,28 @@ export function AnimatedAuthLayout({
         <div className="absolute bottom-1/4 left-1/4 size-96 bg-primary-foreground/5 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* Right Section - Form content */}
-      <div className="flex items-center justify-center p-4 sm:p-6 md:p-8 bg-background min-h-screen">
-        <div className="w-full max-w-[420px] py-8 sm:py-0">
+      {/* Right Section - Glassmorphism Form */}
+      <div className={cn(
+        "flex items-center justify-center p-4 sm:p-6 md:p-8 min-h-screen relative",
+        theme === 'dark' ? 'bg-[#0a0b0f]' : 'bg-neutral-50'
+      )}>
+        {/* Subtle ambient gradient */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: theme === 'dark'
+              ? 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 60%)'
+              : 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.04) 0%, transparent 60%)'
+          }}
+        />
+
+        <div className={cn(
+          "relative w-full max-w-[440px] py-10 px-8 sm:px-10 rounded-3xl",
+          "border backdrop-blur-xl transition-all duration-300",
+          theme === 'dark'
+            ? 'bg-white/[0.03] border-white/[0.06] shadow-[0_0_40px_-10px_rgba(99,102,241,0.08)]'
+            : 'bg-white/70 border-white/60 shadow-[0_4px_40px_-10px_rgba(0,0,0,0.08)]'
+        )}>
           <Link
             to="/"
             className="lg:hidden flex items-center justify-center gap-2 text-lg font-semibold mb-8 sm:mb-12 hover:opacity-90 transition-opacity touch-manipulation"

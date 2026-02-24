@@ -31,12 +31,14 @@ export function ChatTopBar() {
 
   return (
     <div className="relative shrink-0">
-      {/* Header Bar */}
-      <div 
+      {/* Header Bar — Glassmorphism */}
+      <div
         className="flex items-center justify-between px-4 py-3"
-        style={{ 
-          borderBottom: '1px solid var(--ide-border)',
-          background: 'var(--ide-surface)'
+        style={{
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          background: 'rgba(255, 255, 255, 0.03)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
         }}
       >
         {/* Logo & Title */}

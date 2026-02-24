@@ -122,13 +122,20 @@ function getAgentBgColor(name?: string) {
 function DiscussionBubble({ message }: { message: ChatMessage }) {
   const IconComp = getAgentIcon(message.agentIcon);
   const color = getAgentColor(message.agentName);
-  const bgColor = getAgentBgColor(message.agentName);
 
   return (
-    <div className="px-4 py-2">
-      <div className={cn("max-w-[95%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed border shadow-sm", bgColor)}>
+    <div className="px-5 py-1.5 message-bubble">
+      <div
+        className="max-w-[95%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed"
+        style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+        }}
+      >
         <div className="flex items-center gap-2 mb-2">
-          <div className={cn("w-6 h-6 rounded-full flex items-center justify-center", bgColor)}>
+          <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(255, 255, 255, 0.06)' }}>
             <IconComp size={14} className={color} />
           </div>
           <span className={cn("text-[12px] font-semibold", color)}>
@@ -157,8 +164,16 @@ function AgentStatusBubble({ message }: { message: ChatMessage }) {
   const isResult = message.messageType === 'agent_result';
 
   return (
-    <div className="px-4 py-1.5">
-      <div className="flex items-center gap-3 text-[13px] px-4 py-2 rounded-xl" style={{ background: 'var(--ide-surface)' }}>
+    <div className="px-5 py-1.5 message-bubble">
+      <div
+        className="flex items-center gap-3 text-[13px] px-4 py-2.5 rounded-xl"
+        style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+        }}
+      >
         <div className={cn("w-7 h-7 rounded-full flex items-center justify-center", isResult ? "bg-green-500/20" : "bg-blue-500/20")}>
           {isResult ? (
             <CheckCircle2 size={14} className="text-green-400" />
@@ -263,14 +278,25 @@ function EventCardBubble({ message }: { message: ChatMessage }) {
 
 function AITeamTypingIndicator() {
   return (
-    <div className="px-4 py-1">
-      <div className="inline-flex items-center gap-2.5 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-2.5 text-[13px]">
-        <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-blue-500/10">
+    <div className="px-5 py-1 message-bubble">
+      <div
+        className="inline-flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-[13px]"
+        style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+        }}
+      >
+        <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99, 102, 241, 0.12)' }}>
           <Brain size={14} className="text-blue-400" />
         </div>
         <span className="text-[12px] font-semibold text-blue-400">AI Team</span>
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-[12px] font-medium text-emerald-400">typing</span>
+        <div className="flex gap-1 ml-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 typing-dot" />
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 typing-dot" />
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 typing-dot" />
+        </div>
       </div>
     </div>
   );
@@ -296,21 +322,30 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
   const agentName = isUser ? 'You' : (message.agentName || 'AI Team');
   const IconComp = isUser ? User : getAgentIcon(message.agentIcon);
-  const nameColor = isUser ? 'text-blue-400' : getAgentColor(message.agentName);
+  const nameColor = isUser ? 'text-indigo-300' : getAgentColor(message.agentName);
 
   return (
-    <div className={cn("px-4 py-2", isUser ? "flex justify-end" : "flex justify-start")}>
-      <div className={cn(
-        "max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed shadow-sm",
-        isUser
-          ? "bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30"
-          : cn("border", getAgentBgColor(message.agentName) || "border border-var(--ide-border) bg-var(--ide-surface)")
-      )}>
+    <div className={cn("px-5 py-1.5 message-bubble", isUser ? "flex justify-end" : "flex justify-start")}>
+      <div
+        className="max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed"
+        style={isUser ? {
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(139, 92, 246, 0.14))',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(99, 102, 241, 0.25)',
+          boxShadow: '0 2px 12px rgba(99, 102, 241, 0.08)',
+        } : {
+          background: 'rgba(255, 255, 255, 0.03)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+        }}
+      >
         <div className="flex items-center gap-2.5 mb-2">
-          <div className={cn(
-            "w-7 h-7 rounded-full flex items-center justify-center",
-            isUser ? "bg-blue-500/20" : "bg-var(--ide-surface-hover)"
-          )}>
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: isUser ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.06)' }}
+          >
             <IconComp size={14} className={nameColor} />
           </div>
           <span className={cn("text-[12px] font-semibold", nameColor)}>
@@ -318,25 +353,28 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           </span>
           {message.isStreaming && (
             <div className="flex items-center gap-1.5 ml-auto">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-              <span className="text-[10px] text-blue-400">typing</span>
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 typing-dot" />
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 typing-dot" />
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 typing-dot" />
+              </div>
             </div>
           )}
         </div>
-        <div className="whitespace-pre-wrap break-words pl-9" style={{ color: 'var(--ide-text)' }}>{message.content}</div>
+        <div className="whitespace-pre-wrap break-words pl-9" style={{ color: isUser ? 'rgba(255, 255, 255, 0.92)' : 'var(--ide-text)' }}>{message.content}</div>
 
         {/* File badges */}
         {message.files && message.files.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-3 pt-3 pl-9" style={{ borderTop: '1px solid var(--ide-border-subtle)' }}>
+          <div className="flex flex-wrap gap-2 mt-3 pt-3 pl-9" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
             {message.files.map((f) => (
               <span
                 key={f.path}
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium",
-                  f.status === 'done'
-                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                    : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                )}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                style={{
+                  background: f.status === 'done' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(99, 102, 241, 0.1)',
+                  color: f.status === 'done' ? '#6ee7b7' : '#a5b4fc',
+                  border: `1px solid ${f.status === 'done' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)'}`,
+                }}
               >
                 <Code2 size={12} />
                 {f.path.split('/').pop()}
@@ -720,14 +758,19 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
 
   return (
     <aside
-      className={cn("flex flex-col h-full", embedded ? "w-full min-w-0" : "shrink-0")}
-      style={embedded ? { background: "var(--ide-chat-bg)" } : {
-        width: "480px", minWidth: 400, maxWidth: 600,
-        background: "var(--ide-chat-bg)",
-        borderLeft: '1px solid var(--ide-border)',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-      }}
+      className={cn("flex flex-col h-full relative overflow-hidden", embedded ? "w-full min-w-0" : "shrink-0")}
+      style={!embedded ? { width: "480px", minWidth: 400, maxWidth: 600 } : {}}
     >
+      {/* Glass Background Overlay */}
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background: embedded ? "rgba(0, 0, 0, 0.45)" : "rgba(0, 0, 0, 0.35)",
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderLeft: embedded ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
+        }}
+      />
       {/* Top Navigation Bar */}
       <ChatTopBar />
 
@@ -735,15 +778,24 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
 
       {/* Messages or Welcome */}
       <div className={cn(
-        "flex-1 min-h-0",
-        isEmpty ? "overflow-hidden" : "overflow-y-auto py-4 pb-28 space-y-1"
+        "flex-1 min-h-0 chat-scroll",
+        isEmpty ? "overflow-hidden" : "overflow-y-auto py-4 pb-28 space-y-0.5"
       )}>
         {isEmpty ? (
           <div className="flex flex-col h-full px-6">
             {/* Hero Section */}
             <div className="flex-1 flex flex-col items-center justify-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-6 border border-blue-500/30">
-                <Sparkles size={28} className="text-blue-400" />
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.12))',
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  boxShadow: '0 4px 24px rgba(99, 102, 241, 0.1)',
+                }}
+              >
+                <Sparkles size={28} className="text-indigo-400" />
               </div>
               <h2 className="text-[26px] font-bold mb-3 tracking-tight text-center" style={{ color: 'var(--ide-text)' }}>
                 What do you want to build?
@@ -788,10 +840,12 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
                         textarea.focus();
                       }
                     }}
-                    className="flex items-start gap-3 p-3 rounded-xl border text-left transition-all hover:scale-[1.02] hover:border-blue-500/50"
+                    className="flex items-start gap-3 p-3 rounded-xl text-left transition-all duration-300 hover:scale-[1.02]"
                     style={{
-                      background: 'var(--ide-surface)',
-                      borderColor: 'var(--ide-border)',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
                     }}
                   >
                     <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", "bg-var(--ide-surface-hover)")}>
@@ -860,23 +914,25 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t bg-background shrink-0" style={{ borderColor: 'var(--ide-border)' }}>
+      {/* Input Area — Glassmorphism */}
+      <div className="p-4 shrink-0" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.04)' }}>
         {/* Attachments Display */}
         {attachments.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">
             {attachments.map((attachment) => (
               <div
                 key={attachment.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
                 style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                   color: 'rgba(255, 255, 255, 0.8)'
                 }}
               >
                 {attachment.type === 'image' ? (
-                  <Paperclip size={14} className="text-blue-400" />
+                  <Paperclip size={14} className="text-indigo-400" />
                 ) : attachment.type === 'code' ? (
                   <Code2 size={14} className="text-green-400" />
                 ) : (
@@ -884,7 +940,7 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
                 )}
                 <span className="truncate max-w-[140px] font-medium">{attachment.name}</span>
                 <button
-                  className="p-0.5 rounded transition-colors"
+                  className="p-0.5 rounded transition-colors hover:bg-white/10"
                   style={{ color: 'var(--ide-text-muted)' }}
                   onClick={() => removeAttachment(attachment.id)}
                 >
@@ -895,7 +951,10 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
           </div>
         )}
 
-        <div className="flex flex-col gap-2 p-3 rounded-xl border border-input bg-zinc-900/50 focus-within:border-primary transition-colors">
+        <div
+          className="glass-input flex flex-col gap-2 p-3 rounded-2xl cursor-text relative z-10"
+          onClick={() => textareaRef.current?.focus()}
+        >
           <div className="flex items-start gap-2">
             {/* Attachment Button */}
             <input
@@ -907,8 +966,11 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
               accept=".txt,.py,.js,.ts,.tsx,.jsx,.md,.json,.yaml,.yml,.html,.css,.scss,.png,.jpg,.jpeg,.gif,.svg,.pdf"
             />
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 transition-colors"
+              onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+              className="p-1.5 rounded-lg transition-all duration-200 shrink-0"
+              style={{ color: 'rgba(255, 255, 255, 0.4)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255, 255, 255, 0.4)'; }}
               title="Add context (files, images)"
             >
               <Plus size={16} />
@@ -916,22 +978,30 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
 
             <textarea
               ref={textareaRef}
+              id="chat-textarea"
               rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="What do you want to build?"
-              className="w-full bg-transparent border-none outline-none resize-none text-[14px] leading-relaxed py-1 no-scrollbar"
+              className="w-full bg-transparent border-none outline-none resize-none text-[14px] leading-relaxed py-1 no-scrollbar relative z-20"
+              style={{ color: 'rgba(255, 255, 255, 0.9)', minHeight: '24px' }}
               disabled={isStreaming}
             />
 
             {/* Send/Stop Button */}
-            <div className="shrink-0 mt-1">
+            <div className="shrink-0 mt-0.5 relative z-20" onClick={(e) => e.stopPropagation()}>
               {isStreaming ? (
                 <button
                   onClick={handleStop}
-                  className="p-2 rounded-lg flex items-center gap-1.5 text-[12px] font-medium transition-all hover:bg-red-500/20"
-                  style={{ color: '#ef4444' }}
+                  className="p-2 rounded-xl flex items-center gap-1.5 text-[12px] font-medium transition-all duration-200"
+                  style={{
+                    color: '#ef4444',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.18)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; }}
                 >
                   <RotateCcw size={16} />
                 </button>
@@ -940,11 +1010,15 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
                   onClick={handleSend}
                   disabled={!input.trim() || isStreaming}
                   className={cn(
-                    "p-1.5 rounded-lg transition-all",
+                    "p-2 rounded-xl transition-all duration-200",
                     input.trim() && !isStreaming
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                      : "bg-zinc-800 text-zinc-500 opacity-50 cursor-not-allowed"
+                      ? "send-btn-glow text-white"
+                      : "cursor-not-allowed"
                   )}
+                  style={!input.trim() || isStreaming ? {
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    color: 'rgba(255, 255, 255, 0.2)',
+                  } : undefined}
                 >
                   <ArrowRight size={16} />
                 </button>
@@ -954,9 +1028,16 @@ export function AtomsChatPanel({ embedded }: { embedded?: boolean }) {
 
           {/* Keyboard hint */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700/50 text-[10px] text-zinc-400">
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px]"
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                color: 'rgba(255, 255, 255, 0.3)',
+              }}
+            >
               <span>Enter to send</span>
-              <span className="w-1 h-1 rounded-full bg-zinc-600" />
+              <span className="w-1 h-1 rounded-full" style={{ background: 'rgba(255, 255, 255, 0.15)' }} />
               <span>Shift+Enter new line</span>
             </div>
           </div>

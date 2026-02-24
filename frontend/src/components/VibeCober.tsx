@@ -25,6 +25,10 @@ import {
   CreditCard,
   Info,
   Users,
+  Layers,
+  Globe,
+  Cpu,
+  Rocket,
 } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -33,6 +37,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { DottedSurface } from '@/components/ui/dotted-surface';
 import { AnimeNavBar } from '@/components/ui/anime-navbar';
+import { PricingSection } from '@/components/blocks/pricing-section';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +56,69 @@ interface FolderNode {
   children?: FolderNode[];
 }
 
+const PAYMENT_FREQUENCIES = ["monthly", "yearly"]
+
+const PRICING_TIERS = [
+  {
+    id: "individuals",
+    name: "Individuals",
+    price: { monthly: "Free", yearly: "Free" },
+    description: "For your hobby projects",
+    features: [
+      "Free email alerts",
+      "3-minute checks",
+      "Automatic data enrichment",
+      "10 monitors",
+      "Up to 3 seats",
+    ],
+    cta: "Get started",
+  },
+  {
+    id: "teams",
+    name: "Teams",
+    price: { monthly: 90, yearly: 75 },
+    description: "Great for small businesses",
+    features: [
+      "Unlimited phone calls",
+      "30 second checks",
+      "Single-user account",
+      "20 monitors",
+      "Up to 6 seats",
+    ],
+    cta: "Get started",
+    popular: true,
+  },
+  {
+    id: "organizations",
+    name: "Organizations",
+    price: { monthly: 120, yearly: 100 },
+    description: "Great for large businesses",
+    features: [
+      "Unlimited phone calls",
+      "15 second checks",
+      "Single-user account",
+      "50 monitors",
+      "Up to 10 seats",
+    ],
+    cta: "Get started",
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: { monthly: "Custom", yearly: "Custom" },
+    description: "For multiple teams",
+    features: [
+      "Everything in Organizations",
+      "Up to 5 team members",
+      "100 monitors",
+      "15 status pages",
+      "200+ integrations",
+    ],
+    cta: "Contact Us",
+    highlighted: true,
+  },
+]
+
 const ANIME_NAV_ITEMS = [
   { name: 'Home', url: '#manifesto', icon: Home },
   { name: 'Discover', url: '#discover', icon: Compass },
@@ -68,6 +136,7 @@ const VibeCober: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isChatFocused, setIsChatFocused] = useState(false);
   const [cookFontIndex, setCookFontIndex] = useState(0);
+  const landingTextareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // 7 fonts + colors for the cycling "cook" word
   const cookStyles = [
@@ -92,6 +161,7 @@ const VibeCober: React.FC = () => {
   const fullPlaceholder = 'Make me a SaaS app with authentication and payments...';
 
   useEffect(() => {
+    if (isChatFocused || idea.length > 0) return;
     let index = 0;
     const interval = setInterval(() => {
       if (index <= fullPlaceholder.length) {
@@ -103,7 +173,7 @@ const VibeCober: React.FC = () => {
     }, 50);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isChatFocused, idea]);
 
   const handleGenerate = async () => {
     if (!idea.trim()) return;
@@ -205,18 +275,21 @@ const VibeCober: React.FC = () => {
             <div className="hidden md:flex items-center gap-6 text-sm">
               <a
                 href="#manifesto"
+                onClick={(e) => { e.preventDefault(); document.querySelector('#manifesto')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Manifesto
               </a>
               <a
                 href="#careers"
+                onClick={(e) => { e.preventDefault(); document.querySelector('#careers')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Careers
               </a>
               <a
                 href="#discover"
+                onClick={(e) => { e.preventDefault(); document.querySelector('#discover')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Discover
@@ -286,18 +359,21 @@ const VibeCober: React.FC = () => {
               </Button>
               <a
                 href="#manifesto"
+                onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); document.querySelector('#manifesto')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Manifesto
               </a>
               <a
                 href="#careers"
+                onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); document.querySelector('#careers')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Careers
               </a>
               <a
                 href="#discover"
+                onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); document.querySelector('#discover')?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Discover
@@ -318,7 +394,7 @@ const VibeCober: React.FC = () => {
 
   const renderLandingPage = () => {
     return (
-      <div className="relative min-h-screen overflow-hidden">
+      <div className="relative min-h-screen">
         <DottedSurface className="opacity-90" />
         <div
           aria-hidden="true"
@@ -337,7 +413,7 @@ const VibeCober: React.FC = () => {
           )}
         />
 
-        <section id="manifesto" className="relative z-10 min-h-screen flex items-center justify-center px-4 sm:px-6 pt-28 sm:pt-36 md:pt-32 pb-12 sm:pb-20">
+        <section id="manifesto" className="relative z-20 min-h-screen flex items-center justify-center px-4 sm:px-6 pt-28 sm:pt-36 md:pt-32 pb-12 sm:pb-20">
           <div className="max-w-4xl mx-auto text-center space-y-6 sm:space-y-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -356,23 +432,13 @@ const VibeCober: React.FC = () => {
                 </span>
                 <span
                   style={{
-                    background: 'linear-gradient(135deg, #2D5CFE 0%, #6366f1 100%)',
+                    background: 'linear-gradient(135deg, #2D5CFE 0%, #6366f1 35%, #7c3aed 60%, #a855f7 85%, #9333ea 100%)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
                   }}
                 >
-                  CO
-                </span>
-                <span
-                  style={{
-                    background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #9333ea 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
-                >
-                  DER
+                  CODER
                 </span>
               </h1>
               <p
@@ -381,47 +447,45 @@ const VibeCober: React.FC = () => {
                   theme === 'dark' ? 'text-muted-foreground' : 'text-[#555555]'
                 )}
               >
-                Let's{' '}
+                Code At Vibe{' '}
                 <span
                   style={{
                     fontFamily: cookStyles[cookFontIndex].fontFamily,
-                    color: cookStyles[cookFontIndex].color,
-                    transition: 'all 0.4s ease-in-out',
+                    transition: 'font-family 0.4s ease-in-out',
                     display: 'inline-block',
                   }}
                 >
-                  cook
+                  Speed
                 </span>
-                {' '}some code.
               </p>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.2 }}
-              className="relative mx-auto w-full px-3 sm:px-0"
-              style={{ maxWidth: '48rem' }}
+            {/* ── Minimal Expanding Chat Box ── */}
+            <div
+              className={cn(
+                'relative mx-auto w-full px-3 sm:px-0 transition-all duration-500 ease-in-out',
+                isChatFocused ? 'sm:max-w-[52rem]' : 'sm:max-w-[40rem]'
+              )}
+              style={{ zIndex: 9999 }}
             >
               <div
-                className="relative rounded-2xl cursor-text overflow-hidden"
-                onClick={() => {
-                  const ta = document.querySelector<HTMLTextAreaElement>('#landing-chat-textarea');
-                  ta?.focus();
-                }}
-                style={{
-                  background: theme === 'dark'
-                    ? 'rgba(255,255,255,0.04)'
-                    : 'rgba(255,255,255,0.9)',
-                  border: theme === 'dark'
-                    ? '1px solid rgba(255,255,255,0.08)'
-                    : '1px solid rgba(0,0,0,0.08)',
-                  boxShadow: theme === 'dark'
-                    ? '0 2px 12px rgba(0,0,0,0.2)'
-                    : '0 2px 12px rgba(0,0,0,0.04)',
-                }}
+                className={cn(
+                  'relative rounded-2xl transition-all duration-300 cursor-text',
+                  theme === 'dark'
+                    ? 'bg-[#111318] border border-white/[0.06]'
+                    : 'bg-white border border-neutral-200/80',
+                  isChatFocused
+                    ? theme === 'dark'
+                      ? 'shadow-[0_0_0_1px_rgba(99,102,241,0.2),0_2px_20px_-4px_rgba(99,102,241,0.1)]'
+                      : 'shadow-[0_0_0_1px_rgba(99,102,241,0.15),0_2px_20px_-4px_rgba(99,102,241,0.08)]'
+                    : theme === 'dark'
+                      ? 'shadow-md'
+                      : 'shadow-sm'
+                )}
               >
-                <Textarea
+                {/* Textarea */}
+                <textarea
+                  ref={landingTextareaRef}
                   id="landing-chat-textarea"
                   value={idea}
                   onChange={(e) => setIdea(e.target.value)}
@@ -433,54 +497,93 @@ const VibeCober: React.FC = () => {
                       handleGenerate();
                     }
                   }}
-                  placeholder={placeholder}
+                  placeholder="What are we building today?"
+                  rows={isChatFocused ? 4 : 2}
                   className={cn(
-                    'border-none bg-transparent focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-                    'resize-none touch-manipulation leading-relaxed',
-                    'text-[15px] sm:text-base px-5 sm:px-6 pt-5 sm:pt-6 pb-3',
-                    'min-h-[100px] sm:min-h-[120px]',
+                    'w-full border-none bg-transparent outline-none ring-0 focus:ring-0 focus:outline-none',
+                    'resize-none leading-relaxed transition-all duration-300',
+                    'text-base sm:text-lg px-5 pt-5 pb-3',
                     theme === 'dark'
-                      ? 'placeholder:text-white/25 text-white/90'
-                      : 'placeholder:text-neutral-400 text-neutral-800'
+                      ? 'text-white/90 placeholder:text-white/25'
+                      : 'text-neutral-900 placeholder:text-neutral-400'
                   )}
                 />
 
+                {/* Suggestion chips — only visible when focused & empty */}
+                <AnimatePresence>
+                  {isChatFocused && !idea.trim() && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden px-5 pb-2"
+                    >
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { label: 'SaaS App', icon: Layers },
+                          { label: 'API Backend', icon: Cpu },
+                          { label: 'Portfolio Site', icon: Globe },
+                          { label: 'E-commerce', icon: Rocket },
+                        ].map(({ label, icon: Icon }) => (
+                          <button
+                            key={label}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setIdea(label);
+                            }}
+                            className={cn(
+                              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
+                              'transition-all duration-150 border',
+                              theme === 'dark'
+                                ? 'border-white/[0.06] bg-white/[0.03] text-white/40 hover:text-white/60 hover:border-white/[0.12]'
+                                : 'border-neutral-200 bg-neutral-50 text-neutral-400 hover:text-neutral-600 hover:border-neutral-300'
+                            )}
+                          >
+                            <Icon className="w-3 h-3" />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {/* Bottom bar */}
                 <div
-                  className="flex items-center justify-between px-4 sm:px-5 py-2.5"
-                  style={{
-                    borderTop: theme === 'dark'
-                      ? '1px solid rgba(255,255,255,0.05)'
-                      : '1px solid rgba(0,0,0,0.04)',
-                  }}
+                  className={cn(
+                    'flex items-center justify-between px-5 py-3',
+                    theme === 'dark'
+                      ? 'border-t border-white/[0.04]'
+                      : 'border-t border-neutral-100'
+                  )}
                 >
-                  <p className={cn(
-                    'text-xs',
-                    theme === 'dark' ? 'text-white/25' : 'text-neutral-400'
+                  <span className={cn(
+                    'text-[11px] tracking-wide',
+                    theme === 'dark' ? 'text-white/20' : 'text-neutral-300'
                   )}>
-                    <kbd className="font-mono text-[10px]">↵</kbd> send · <kbd className="font-mono text-[10px]">⇧↵</kbd> new line
-                  </p>
+                    <kbd className="font-mono text-[10px]">⏎</kbd> to generate
+                  </span>
+
                   <Button
                     onClick={handleGenerate}
                     disabled={!idea.trim()}
-                    size="icon"
+                    size="sm"
                     className={cn(
-                      'rounded-full h-9 w-9 sm:h-10 sm:w-10 transition-colors border-0',
+                      'rounded-full px-5 h-9 text-sm font-medium transition-all duration-200',
                       idea.trim()
-                        ? theme === 'dark'
-                          ? 'bg-white text-black hover:bg-white/90'
-                          : 'bg-neutral-900 text-white hover:bg-neutral-800'
+                        ? 'bg-[#6366f1] hover:bg-[#5558e6] text-white'
                         : theme === 'dark'
-                          ? 'bg-white/[0.06] text-white/20'
-                          : 'bg-neutral-100 text-neutral-300',
-                      'disabled:cursor-not-allowed'
+                          ? 'bg-white/[0.04] text-white/20 cursor-not-allowed'
+                          : 'bg-neutral-100 text-neutral-300 cursor-not-allowed'
                     )}
                   >
-                    <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                    Generate
+                    <ArrowRight className="ml-1.5 w-3.5 h-3.5" />
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         </section>
 
@@ -580,90 +683,15 @@ const VibeCober: React.FC = () => {
         </section>
 
         <section id="pricing" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
-          <div className="max-w-6xl mx-auto">
-            <motion.h2
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
-            >
-              Simple pricing
-            </motion.h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {[
-                {
-                  name: 'Free',
-                  price: '$0',
-                  features: [
-                    'Local AI models',
-                    'Unlimited projects',
-                    'CLI access',
-                    'Community support',
-                  ],
-                },
-                {
-                  name: 'Pro',
-                  price: '$19',
-                  features: [
-                    'Everything in Free',
-                    'Cloud sync',
-                    'Priority support',
-                    'Advanced templates',
-                  ],
-                  highlight: true,
-                },
-                {
-                  name: 'Team',
-                  price: '$49',
-                  features: [
-                    'Everything in Pro',
-                    'Team collaboration',
-                    'Custom models',
-                    'Dedicated support',
-                  ],
-                },
-              ].map((plan, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                >
-                  <Card
-                    className={`p-6 sm:p-8 ${plan.highlight
-                      ? 'border-2 border-primary bg-primary/5'
-                      : 'bg-card border border-border'
-                      } shadow-sm`}
-                  >
-                    <h3 className="text-xl sm:text-2xl font-bold mb-2 text-foreground">{plan.name}</h3>
-                    <div className="text-3xl sm:text-4xl font-bold mb-4 sm:mb-6 text-foreground">
-                      {plan.price}
-                      <span className="text-lg text-muted-foreground">/mo</span>
-                    </div>
-                    <ul className="space-y-3 mb-8">
-                      {plan.features.map((feature, j) => (
-                        <li key={j} className="flex items-center gap-2">
-                          <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
-                          <span className="text-muted-foreground">
-                            {feature}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Link to="/signup">
-                      <Button
-                        className="w-full"
-                        variant={plan.highlight ? 'default' : 'outline'}
-                      >
-                        Get started
-                      </Button>
-                    </Link>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+          <div className="relative -z-10 mx-auto max-w-6xl">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:35px_35px] opacity-30 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
           </div>
+          <PricingSection
+            title="Simple Pricing"
+            subtitle="Choose the best plan for your needs"
+            frequencies={PAYMENT_FREQUENCIES}
+            tiers={PRICING_TIERS}
+          />
         </section>
 
         <section id="testimonials" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-muted/50">
@@ -1231,44 +1259,51 @@ const VibeCober: React.FC = () => {
               'vibe-coder-logo fixed z-[9999] flex items-center',
               'top-[max(1rem,env(safe-area-inset-top))] left-4 sm:left-6',
               'text-base sm:text-xl md:text-2xl uppercase tracking-tight',
-              'px-2.5 py-1 sm:px-3 sm:py-1.5 border-2 rounded-[2px]',
-              'transition-colors select-none',
+              'px-3 py-1 sm:px-4 sm:py-2 border rounded-full',
+              'transition-all duration-300 select-none backdrop-blur-xl shadow-lg',
               theme === 'dark'
-                ? 'text-white border-white/90 hover:border-white'
-                : 'text-gray-900 border-gray-900 hover:border-gray-700'
+                ? 'text-white bg-white/[0.04] border-white/[0.1] hover:bg-white/[0.08] hover:border-white/[0.2]'
+                : 'text-gray-900 bg-white/70 border-black/[0.06] hover:bg-white/90 hover:border-black/[0.12]'
             )}
           >
             vibecoder
           </a>
           <AnimeNavBar items={ANIME_NAV_ITEMS} defaultActive="Home" />
-          <div className="fixed top-[max(1rem,env(safe-area-inset-top))] right-4 sm:right-6 z-[9999] flex items-center gap-2 sm:gap-3">
+          <div className={cn(
+            "fixed top-[max(1rem,env(safe-area-inset-top))] right-4 sm:right-6 z-[9999]",
+            "flex items-center gap-2 sm:gap-3 px-2 py-1.5 rounded-full border backdrop-blur-xl shadow-lg transition-all duration-300",
+            theme === 'dark'
+              ? 'bg-white/[0.04] border-white/[0.1] shadow-black/20'
+              : 'bg-white/70 border-black/[0.06] shadow-black/5'
+          )}>
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={toggleTheme}
               className={cn(
-                'rounded-full backdrop-blur-lg h-9 w-9 sm:h-10 sm:w-10 touch-manipulation',
+                'rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors',
                 theme === 'dark'
-                  ? 'bg-black/30 border-white/10'
-                  : 'bg-white/80 border-gray-200/80'
+                  ? 'hover:bg-white/10 text-white'
+                  : 'hover:bg-black/5 text-gray-700'
               )}
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-white" />
+                <Sun className="w-4 h-4" />
               ) : (
-                <Moon className="w-4 h-4 text-gray-700" />
+                <Moon className="w-4 h-4" />
               )}
             </Button>
+            <Separator orientation="vertical" className="h-4 bg-border/20" />
             <Link to="/login">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  'touch-manipulation min-h-[44px] sm:min-h-0',
+                  'h-8 sm:h-9 px-3 sm:px-4 rounded-full transition-all',
                   theme === 'dark'
                     ? 'text-white/80 hover:text-white hover:bg-white/10'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-black/5'
                 )}
               >
                 Login
@@ -1278,10 +1313,10 @@ const VibeCober: React.FC = () => {
               <Button
                 size="sm"
                 className={cn(
-                  'touch-manipulation min-h-[44px] sm:min-h-0 px-3 sm:px-4',
+                  'h-8 sm:h-9 px-4 sm:px-5 rounded-full transition-all font-semibold',
                   theme === 'dark'
-                    ? 'bg-white text-black hover:bg-white/90'
-                    : 'bg-gray-800 text-white hover:bg-gray-700'
+                    ? 'bg-white text-black hover:bg-neutral-200'
+                    : 'bg-black text-white hover:bg-neutral-800'
                 )}
               >
                 Sign Up

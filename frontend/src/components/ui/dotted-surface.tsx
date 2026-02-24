@@ -48,6 +48,7 @@ export function DottedSurface({ className, children, ...props }: DottedSurfacePr
     renderer.domElement.style.left = '0';
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
+    renderer.domElement.style.pointerEvents = 'none';
 
     containerRef.current.appendChild(renderer.domElement);
 

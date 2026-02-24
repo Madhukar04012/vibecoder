@@ -57,7 +57,7 @@ export default function NovaIDE() {
           <Group orientation="horizontal" id="atmos-main-v3">
             {/* Chat Panel */}
             <Panel id="atmos-chat" defaultSize={35} minSize={"320px"}>
-              <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'var(--ide-chat-bg)', borderRight: '1px solid var(--ide-border)', zIndex: 10 }}>
+              <div className="h-full flex flex-col overflow-hidden relative" style={{ background: 'var(--ide-chat-bg)', borderRight: '1px solid var(--ide-border)', zIndex: 100 }}>
                 <div className="shrink-0 flex p-1 gap-1 rounded-lg" style={{ background: 'var(--ide-bg)', margin: 8 }}>
                   <button
                     type="button"
