@@ -813,13 +813,29 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <section id="pricing" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
-          <div className="relative -z-10 mx-auto max-w-6xl pointer-events-none">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:35px_35px] opacity-30 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
+        <section id="pricing" className="relative overflow-hidden py-24 sm:py-32 px-4 sm:px-6">
+          {/* Ambient Background Glows */}
+          <div className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-[500px] w-[800px] -translate-x-1/2 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.15),transparent_70%)] blur-[100px]" />
+          <div className="pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[400px] w-[600px] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.1),transparent_70%)] blur-[80px]" />
+          
+          <div className="text-center mb-16 relative z-10">
+            <span className="inline-block text-xs font-bold uppercase tracking-[0.2em] text-indigo-400/80 mb-4">Pricing</span>
+            <h2 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-white mb-6">
+              Pay for what you <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">actually use</span>
+            </h2>
+            <p className="mt-4 text-gray-400 text-lg sm:text-xl max-w-2xl mx-auto leading-relaxed">
+              Start free, no card required. Scale as you grow. <br className="hidden sm:block" />
+              MIT licensed code that you own forever.
+            </p>
           </div>
+
+          <div className="relative -z-10 mx-auto max-w-6xl pointer-events-none">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:40px_40px] opacity-20 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
+          </div>
+
           <PricingSection
-            title="Simple Pricing"
-            subtitle="Choose the best plan for your needs"
+            title=""
+            subtitle=""
             frequencies={PAYMENT_FREQUENCIES}
             tiers={PRICING_TIERS}
           />
