@@ -495,7 +495,7 @@ const VibeCober: React.FC = () => {
               </p>
             </motion.div>
 
-            {/* ── Workbench Command Palette Input ── */}
+            {/* ── Premium Glass Command Input ── */}
             <div
               className={cn(
                 'relative mx-auto w-full px-3 sm:px-0 transition-all duration-500 ease-in-out',
@@ -504,35 +504,47 @@ const VibeCober: React.FC = () => {
               style={{ zIndex: 9999 }}
             >
               <div
+                onClick={() => landingTextareaRef.current?.focus()}
                 className={cn(
-                  'relative rounded-xl overflow-hidden transition-all duration-300 cursor-text',
+                  'relative rounded-2xl overflow-hidden transition-all duration-300 cursor-text group',
+                  'backdrop-blur-xl border',
                   theme === 'dark'
-                    ? 'bg-[#0a0c10] border border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]'
-                    : 'bg-white border border-neutral-200 shadow-xl',
-                  isChatFocused && (theme === 'dark' ? 'border-indigo-500/50 ring-1 ring-indigo-500/20' : 'border-indigo-500/40 ring-1 ring-indigo-500/10')
+                    ? 'bg-black/40 border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]'
+                    : 'bg-white/80 border-neutral-200 shadow-xl',
+                  isChatFocused && (theme === 'dark' ? 'border-indigo-500/40 shadow-[0_0_30px_-4px_rgba(99,102,241,0.2)]' : 'border-indigo-500/30 shadow-[0_0_30px_-4px_rgba(99,102,241,0.1)]')
                 )}
               >
-                {/* Header / Tab-like bar */}
+                {/* Subtle Header */}
                 <div className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-widest",
-                  theme === 'dark' ? "bg-white/5 text-white/40" : "bg-neutral-50 text-neutral-400"
+                  "flex items-center justify-between px-5 py-2.5 border-b transition-colors duration-300",
+                  theme === 'dark' ? "bg-white/5 border-white/5" : "bg-neutral-50/50 border-neutral-100"
                 )}>
-                  <div className="flex gap-1.5 mr-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/30" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500/30" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/30" />
+                  <div className="flex items-center gap-2">
+                    <Terminal className={cn(
+                      "w-3.5 h-3.5",
+                      theme === 'dark' ? "text-indigo-400" : "text-indigo-600"
+                    )} />
+                    <span className={cn(
+                      "text-[10px] font-bold uppercase tracking-[0.2em]",
+                      theme === 'dark' ? "text-white/40" : "text-neutral-400"
+                    )}>
+                      Project Initializer
+                    </span>
                   </div>
-                  <span>Vibecoder Terminal</span>
+                  <div className="flex gap-1.5 opacity-30">
+                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                  </div>
                 </div>
 
-                <div className="relative flex items-start">
+                <div className="relative flex items-start group-hover:bg-white/[0.02] transition-colors duration-300">
                   {/* Prompt Prefix */}
-                  <span className={cn(
-                    "pl-5 pr-2 pt-5 select-none font-mono text-lg font-bold",
-                    theme === 'dark' ? "text-indigo-500/80" : "text-indigo-600/60"
+                  <div className={cn(
+                    "pl-5 pr-2 pt-5 select-none font-mono text-xl font-bold bg-gradient-to-b bg-clip-text text-transparent",
+                    theme === 'dark' ? "from-indigo-400 to-violet-500" : "from-indigo-600 to-violet-700"
                   )}>
                     &gt;
-                  </span>
+                  </div>
 
                   {/* Textarea */}
                   <textarea
@@ -548,12 +560,12 @@ const VibeCober: React.FC = () => {
                         handleGenerate();
                       }
                     }}
-                    placeholder={placeholder || 'Initialize new project...'}
+                    placeholder={placeholder || 'Describe your next masterpiece...'}
                     rows={isChatFocused ? 4 : 2}
                     className={cn(
                       'w-full border-none bg-transparent outline-none ring-0 focus:ring-0 focus:outline-none',
                       'resize-none leading-relaxed transition-all duration-300',
-                      'text-base sm:text-lg pr-5 pt-5 pb-3 font-mono',
+                      'text-lg sm:text-xl pr-5 pt-5 pb-3 font-mono tracking-tight',
                       theme === 'dark'
                         ? 'text-white/90 placeholder:text-white/20'
                         : 'text-neutral-900 placeholder:text-neutral-400'
@@ -561,7 +573,7 @@ const VibeCober: React.FC = () => {
                   />
                 </div>
 
-                {/* Technical Stack Presets */}
+                {/* Glass Stack Presets */}
                 <AnimatePresence>
                   {isChatFocused && !idea.trim() && (
                     <motion.div
@@ -569,17 +581,17 @@ const VibeCober: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
                       className={cn(
-                        "px-5 pb-4 pt-1",
-                        theme === 'dark' ? "bg-[#0d1016]" : "bg-neutral-50/50"
+                        "px-5 pb-5 pt-2",
+                        theme === 'dark' ? "bg-white/5" : "bg-neutral-50/30"
                       )}
                     >
-                      <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2.5 opacity-50">Stack Presets</div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="text-[10px] font-bold text-indigo-400/60 uppercase tracking-widest mb-3">Suggested Stacks</div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {[
-                          { label: 'Next.js + Tailwind', icon: SiVercel },
-                          { label: 'FastAPI + Postgres', icon: SiFastapi },
-                          { label: 'React + Supabase', icon: SiReact },
-                          { label: 'Express + Docker', icon: SiDocker },
+                          { label: 'Next.js 14', icon: SiVercel },
+                          { label: 'FastAPI', icon: SiFastapi },
+                          { label: 'React SPA', icon: SiReact },
+                          { label: 'Dockerized', icon: SiDocker },
                         ].map(({ label, icon: Icon }) => (
                           <button
                             key={label}
@@ -588,14 +600,14 @@ const VibeCober: React.FC = () => {
                               setIdea(label);
                             }}
                             className={cn(
-                              'flex flex-col items-center justify-center gap-2 p-3 rounded-lg border text-center transition-all duration-200',
+                              'flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border transition-all duration-300 group/btn',
                               theme === 'dark'
-                                ? 'bg-[#161b22] border-white/5 text-white/60 hover:border-white/20 hover:text-white hover:bg-[#1c2128]'
-                                : 'bg-white border-neutral-200 text-neutral-500 hover:border-neutral-300 hover:text-neutral-900 hover:shadow-md'
+                                ? 'bg-white/5 border-white/5 text-white/50 hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-white'
+                                : 'bg-white border-neutral-200 text-neutral-500 hover:border-indigo-500/20 hover:text-indigo-600 hover:shadow-lg'
                             )}
                           >
-                            <Icon className="w-5 h-5 opacity-80" />
-                            <span className="text-[10px] font-mono font-medium">{label}</span>
+                            <Icon className="w-5 h-5 transition-transform duration-300 group-hover/btn:scale-110" />
+                            <span className="text-[9px] font-bold tracking-widest uppercase">{label}</span>
                           </button>
                         ))}
                       </div>
@@ -603,52 +615,52 @@ const VibeCober: React.FC = () => {
                   )}
                 </AnimatePresence>
 
-                {/* Workbench Status Bar */}
+                {/* Premium Status Bar */}
                 <div
                   className={cn(
-                    'flex items-center justify-between px-5 py-2.5',
+                    'flex items-center justify-between px-5 py-3 transition-colors duration-300',
                     theme === 'dark'
-                      ? 'bg-[#0d1117] border-t border-white/[0.05]'
+                      ? 'bg-white/[0.03] border-t border-white/[0.05]'
                       : 'bg-neutral-50 border-t border-neutral-200'
                   )}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="flex items-center gap-5">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        idea.trim() ? "bg-indigo-500 animate-pulse" : "bg-emerald-500/50"
+                      )} />
                       <span className={cn(
-                        'text-[10px] font-mono tracking-wider',
+                        'text-[10px] font-bold tracking-[0.2em] transform uppercase',
                         theme === 'dark' ? 'text-white/30' : 'text-neutral-400'
                       )}>
-                        READY
+                        {isGenerating ? 'BUILDING' : idea.trim() ? 'DRAFTING' : 'READY'}
                       </span>
                     </div>
-                    {isGenerating && (
-                      <div className="flex items-center gap-2 text-[10px] font-mono text-indigo-400">
-                        <Terminal className="w-3 h-3 animate-bounce" />
-                        <span>PROCESSING...</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-4">
                     <span className={cn(
-                      'text-[10px] font-mono hidden sm:inline-block',
-                      theme === 'dark' ? 'text-white/20' : 'text-neutral-300'
+                      'text-[9px] font-bold tracking-widest hidden sm:inline-block opacity-30',
+                      theme === 'dark' ? 'text-white' : 'text-neutral-950'
                     )}>
-                      UTF-8
+                      SECURE·ENCRYPTED
                     </span>
                     <button
-                      onClick={handleGenerate}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleGenerate();
+                      }}
                       disabled={!idea.trim() || isGenerating}
                       className={cn(
-                        'flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded transition-all',
+                        'flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.15em] px-4 py-1.5 rounded-full transition-all duration-300',
                         idea.trim() && !isGenerating
-                          ? 'text-indigo-400 hover:text-indigo-300 cursor-pointer'
-                          : 'text-muted-foreground/30'
+                          ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.4)] cursor-pointer scale-105 active:scale-95'
+                          : 'bg-white/5 text-muted-foreground/30'
                       )}
                     >
-                      <Zap className="w-3 h-3" />
-                      Build
+                      <Zap className={cn("w-3 h-3", idea.trim() && "fill-current animate-pulse")} />
+                      Initialise
                     </button>
                   </div>
                 </div>
