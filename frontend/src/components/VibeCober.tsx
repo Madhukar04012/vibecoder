@@ -2,6 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  SiPython,
+  SiFastapi,
+  SiReact,
+  SiTypescript,
+  SiDocker,
+  SiPostgresql,
+  SiVercel,
+  SiGithub,
+  SiAnthropic,
+  SiNvidia,
+  SiOpenai,
+  SiSqlite,
+  SiTailwindcss,
+  SiVite,
+  SiNodedotjs,
+} from 'react-icons/si';
+import {
   ArrowRight,
   Sparkles,
   Code2,
@@ -124,6 +141,24 @@ const ANIME_NAV_ITEMS = [
   { name: 'Discover', url: '#discover', icon: Compass },
   { name: 'Pricing', url: '#pricing', icon: CreditCard },
   { name: 'About', url: '#careers', icon: Info },
+];
+
+const TECH_LOGOS: { icon: React.ElementType; label: string; color: string }[] = [
+  { icon: SiPython, label: 'Python', color: '#3776AB' },
+  { icon: SiFastapi, label: 'FastAPI', color: '#009688' },
+  { icon: SiReact, label: 'React', color: '#61DAFB' },
+  { icon: SiTypescript, label: 'TypeScript', color: '#3178C6' },
+  { icon: SiDocker, label: 'Docker', color: '#2496ED' },
+  { icon: SiPostgresql, label: 'PostgreSQL', color: '#336791' },
+  { icon: SiVercel, label: 'Vercel', color: '#ffffff' },
+  { icon: SiGithub, label: 'GitHub', color: '#ffffff' },
+  { icon: SiAnthropic, label: 'Anthropic', color: '#D4956A' },
+  { icon: SiNvidia, label: 'NVIDIA', color: '#76B900' },
+  { icon: SiOpenai, label: 'OpenAI', color: '#74aa9c' },
+  { icon: SiSqlite, label: 'SQLite', color: '#003B57' },
+  { icon: SiTailwindcss, label: 'Tailwind CSS', color: '#06B6D4' },
+  { icon: SiVite, label: 'Vite', color: '#646CFF' },
+  { icon: SiNodedotjs, label: 'Node.js', color: '#339933' },
 ];
 
 const VibeCober: React.FC = () => {
@@ -497,7 +532,7 @@ const VibeCober: React.FC = () => {
                       handleGenerate();
                     }
                   }}
-                  placeholder="What are we building today?"
+                  placeholder={placeholder || 'What are we building today?'}
                   rows={isChatFocused ? 4 : 2}
                   className={cn(
                     'w-full border-none bg-transparent outline-none ring-0 focus:ring-0 focus:outline-none',
@@ -587,95 +622,191 @@ const VibeCober: React.FC = () => {
           </div>
         </section>
 
-        <section id="how-it-works" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
-          <div className="max-w-6xl mx-auto">
-            <motion.h2
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
+        {/* ── Tech Logo Marquee ── */}
+        <section className="relative py-10 sm:py-14 overflow-hidden border-y border-border/40">
+          <p className="text-center text-xs uppercase tracking-[0.25em] text-muted-foreground/50 mb-6 sm:mb-8 font-medium">
+            Built with the world's best tech
+          </p>
+          <div className="relative flex">
+            {/* fade edges */}
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-background to-transparent" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-background to-transparent" />
+
+            <div
+              className="flex gap-12 sm:gap-16 items-center animate-marquee whitespace-nowrap"
+              style={{ animation: 'marquee 28s linear infinite' }}
             >
-              How it works
-            </motion.h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {TECH_LOGOS.concat(TECH_LOGOS).map((tech, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col items-center gap-2 group flex-shrink-0"
+                  title={tech.label}
+                >
+                  <tech.icon
+                    size={36}
+                    style={{ color: tech.color }}
+                    className="opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+                  />
+                  <span className="text-[10px] text-muted-foreground/50 group-hover:text-muted-foreground transition-colors duration-300 tracking-wide uppercase">
+                    {tech.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <style>{`
+            @keyframes marquee {
+              0%   { transform: translateX(0); }
+              100% { transform: translateX(-50%); }
+            }
+          `}</style>
+        </section>
+
+        <section id="how-it-works" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
+          <div className="max-w-5xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center mb-16 sm:mb-20"
+            >
+              <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary/70 mb-3">The process</span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground">From idea to running code</h2>
+              <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">No boilerplate. No copy-pasting Stack Overflow. Just describe what you need.</p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 relative">
+              {/* connector line — desktop only */}
+              <div className="hidden md:block absolute top-8 left-[calc(16.67%+1rem)] right-[calc(16.67%+1rem)] h-px bg-border/60" />
+
               {[
                 {
+                  num: '01',
                   icon: Sparkles,
-                  title: 'Analyze',
-                  desc: 'Team Lead Brain + Planner decide architecture (MetaGPT-style)',
+                  title: 'Describe your idea',
+                  desc: 'Type a plain sentence — "FastAPI backend with JWT auth and PostgreSQL". That\'s it. No templates, no wizards.',
+                  hint: 'Natural language input',
                 },
                 {
+                  num: '02',
                   icon: Code2,
-                  title: 'Generate',
-                  desc: 'DB, Auth, Coder agents create production-ready code',
+                  title: 'Agents build it',
+                  desc: '7 specialised agents coordinate — PM, Architect, Engineer, QA, DevOps — each doing exactly one job, correctly.',
+                  hint: 'MetaGPT-inspired pipeline',
                 },
                 {
+                  num: '03',
                   icon: Zap,
-                  title: 'Run',
-                  desc: 'Tester + Deployer finish the pipeline. Ready to ship.',
+                  title: 'Ship it',
+                  desc: 'Download a zip, push to GitHub, or deploy straight to Vercel. The project is already tested and Dockerised.',
+                  hint: 'Production-ready output',
                 },
               ].map((step, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 24 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: i * 0.2 }}
+                  transition={{ delay: i * 0.15 }}
+                  className="relative"
                 >
-                  <Card className="p-6 sm:p-8 bg-card border border-border shadow-sm hover:border-primary/50 transition-all">
-                    <step.icon className="w-10 h-10 sm:w-12 sm:h-12 text-primary mb-4 sm:mb-6" />
-                    <h3 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4 text-foreground">{step.title}</h3>
-                    <p className="text-muted-foreground text-sm sm:text-base">{step.desc}</p>
-                  </Card>
+                  <div className={cn(
+                    'relative rounded-2xl border p-6 sm:p-8 h-full transition-all duration-300',
+                    'bg-card hover:bg-card/80 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5',
+                    'border-border'
+                  )}>
+                    {/* step number */}
+                    <span className="text-[11px] font-mono font-bold text-primary/50 tracking-widest mb-4 block">{step.num}</span>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-5" style={{ background: 'hsl(var(--primary)/0.1)' }}>
+                      <step.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">{step.title}</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">{step.desc}</p>
+                    <span className="mt-5 inline-block text-[11px] font-medium text-primary/60 bg-primary/5 px-2.5 py-1 rounded-full">{step.hint}</span>
+                  </div>
                 </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="discover" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-muted/50">
+        <section id="discover" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
           <div className="max-w-6xl mx-auto">
-            <motion.h2
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
+              className="text-center mb-16 sm:mb-20"
             >
-              Why developers like it
-            </motion.h2>
+              <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary/70 mb-3">Why it works</span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground">Built for developers who ship</h2>
+              <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">No toy demos. No hallucinated code. Just real projects you can actually push to production.</p>
+            </motion.div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-12">
+              {[
+                { stat: '7', label: 'Specialised agents' },
+                { stat: '< 2 min', label: 'Avg. gen time' },
+                { stat: '100%', label: 'Real file output' },
+                { stat: '$0', label: 'To get started' },
+              ].map((s, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08 }}
+                  className="text-center rounded-2xl border border-border/60 bg-card/50 px-4 py-6"
+                >
+                  <p className="text-2xl sm:text-3xl font-bold text-foreground">{s.stat}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                </motion.div>
+              ))}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               {[
                 {
-                  title: 'Production-first output',
-                  desc: 'Real, deployable code with proper structure and best practices',
-                },
-                {
+                  icon: Terminal,
                   title: 'Real files, not snippets',
-                  desc: 'Complete project structure with all necessary configurations',
+                  desc: 'You get a full project with folders, configs, migrations and a working entry point — not a gist you have to hack together.',
                 },
                 {
-                  title: 'Local AI, zero API cost',
-                  desc: 'Powered by DeepSeek via NVIDIA NIM. No local install required.',
+                  icon: Zap,
+                  title: 'Production-first, always',
+                  desc: 'Every project ships with error handling, env management, and a test suite. It\'s how a senior dev would actually set things up.',
                 },
                 {
-                  title: 'CLI + Web support',
-                  desc: 'Use it however you prefer. Terminal or browser.',
+                  icon: Globe,
+                  title: 'Any stack, your way',
+                  desc: 'Ask for Django or Go and you\'ll get Django or Go — not React and FastAPI by default. The AI reads what you actually wrote.',
+                },
+                {
+                  icon: Cpu,
+                  title: 'Agent teamwork, not autocomplete',
+                  desc: 'Multiple agents argue about architecture, write tests, review each other\'s code. That tension is what makes the output solid.',
                 },
               ].map((feature, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, x: i % 2 === 0 ? -20 : 20 }}
+                  initial={{ opacity: 0, x: i % 2 === 0 ? -16 : 16 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
                 >
-                  <Card className="p-5 sm:p-6 bg-card border border-border shadow-sm">
-                    <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-primary mb-3 sm:mb-4" />
-                    <h3 className="text-lg sm:text-xl font-semibold mb-2 text-foreground">
-                      {feature.title}
-                    </h3>
-                    <p className="text-muted-foreground text-sm sm:text-base">{feature.desc}</p>
-                  </Card>
+                  <div className={cn(
+                    'flex gap-4 p-5 sm:p-6 rounded-2xl border border-border/60 bg-card',
+                    'hover:border-primary/30 hover:shadow-sm transition-all duration-300 h-full'
+                  )}>
+                    <div className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center mt-0.5" style={{ background: 'hsl(var(--primary)/0.1)' }}>
+                      <feature.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1.5">{feature.title}</h3>
+                      <p className="text-muted-foreground text-sm leading-relaxed">{feature.desc}</p>
+                    </div>
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -683,8 +814,8 @@ const VibeCober: React.FC = () => {
         </section>
 
         <section id="pricing" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
-          <div className="relative -z-10 mx-auto max-w-6xl">
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:35px_35px] opacity-30 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" />
+          <div className="relative -z-10 mx-auto max-w-6xl pointer-events-none">
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:35px_35px] opacity-30 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
           </div>
           <PricingSection
             title="Simple Pricing"
@@ -694,52 +825,77 @@ const VibeCober: React.FC = () => {
           />
         </section>
 
-        <section id="testimonials" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-muted/50">
+        <section id="testimonials" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-muted/30">
           <div className="max-w-6xl mx-auto">
-            <motion.h2
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
+              className="text-center mb-16 sm:mb-20"
             >
-              Trusted by developers
-            </motion.h2>
+              <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary/70 mb-3">Social proof</span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground">Developers who tried it, kept it</h2>
+            </motion.div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
               {[
                 {
                   name: 'Alex Chen',
-                  role: 'Indie Hacker',
-                  text: 'Shipped my MVP in 2 days. This is insane.',
+                  handle: '@alexc_dev',
+                  role: 'Indie Hacker · YC W24',
+                  avatar: 'AC',
+                  avatarBg: '#6366f1',
+                  text: 'I described a SaaS with Stripe and Supabase on a Saturday morning. By lunch I had a repo I could actually deploy. Other tools give you snippets — this gave me a business.',
+                  stars: 5,
                 },
                 {
-                  name: 'Sarah Kim',
-                  role: 'Startup Founder',
-                  text: 'Finally, an AI tool that generates real code.',
+                  name: 'Priya Nair',
+                  handle: '@priya_builds',
+                  role: 'Staff Engineer · Fintech',
+                  avatar: 'PN',
+                  avatarBg: '#0ea5e9',
+                  text: 'The architecture the agents produce is surprisingly opinionated in a good way. Proper separation of concerns, real tests, a working Dockerfile. It\'s not a toy.',
+                  stars: 5,
                 },
                 {
-                  name: 'Mike Johnson',
-                  role: 'Senior Dev',
-                  text: "Best prototyping tool I've used. Period.",
+                  name: 'Marcus Webb',
+                  handle: '@marcuswebb',
+                  role: 'Startup Founder · 2× exit',
+                  avatar: 'MW',
+                  avatarBg: '#f59e0b',
+                  text: "I cut my prototyping time from 3 days to 3 hours. The QA agent actually catches real bugs — I've seen it rewrite a whole auth layer because the first pass had a race condition.",
+                  stars: 5,
                 },
-              ].map((testimonial, i) => (
+              ].map((t, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 24 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
+                  transition={{ delay: i * 0.12 }}
                 >
-                  <Card className="p-6 bg-card border border-border shadow-sm">
-                    <p className="text-muted-foreground mb-6 italic">
-                      &quot;{testimonial.text}&quot;
-                    </p>
-                    <div>
-                      <p className="font-semibold text-foreground">{testimonial.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {testimonial.role}
-                      </p>
+                  <div className="rounded-2xl border border-border/60 bg-card p-6 h-full flex flex-col gap-4 hover:border-primary/30 hover:shadow-sm transition-all duration-300">
+                    {/* Stars */}
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: t.stars }).map((_, si) => (
+                        <svg key={si} className="w-4 h-4 fill-amber-400 text-amber-400" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                      ))}
                     </div>
-                  </Card>
+                    {/* Quote */}
+                    <p className="text-sm sm:text-base text-foreground/80 leading-relaxed flex-1">"{t.text}"</p>
+                    {/* Author */}
+                    <div className="flex items-center gap-3 pt-2 border-t border-border/40">
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                        style={{ background: t.avatarBg }}
+                      >
+                        {t.avatar}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground leading-none">{t.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{t.role}</p>
+                      </div>
+                    </div>
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -747,88 +903,113 @@ const VibeCober: React.FC = () => {
         </section>
 
         <section id="faq" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6">
-          <div className="max-w-3xl mx-auto">
-            <motion.h2
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
+          <div className="max-w-2xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-12 sm:mb-16 md:mb-20 text-foreground"
+              className="text-center mb-12 sm:mb-16"
             >
-              FAQ
-            </motion.h2>
-            <div className="space-y-4 sm:space-y-6">
+              <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary/70 mb-3">Common questions</span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground">Things people ask before trying it</h2>
+            </motion.div>
+            <div className="divide-y divide-border/60">
               {[
                 {
-                  q: 'How does the AI work?',
-                  a: 'Vibecoder uses NVIDIA NIM with DeepSeek. Set NIM_API_KEY in .env to connect. No local model install required.',
+                  q: 'Does it actually write working code?',
+                  a: 'Yes — not pseudocode, not snippets. When you ask for a FastAPI backend with PostgreSQL, you get a project with working routes, SQLAlchemy models, Alembic migrations, and a test suite. It runs.',
                 },
                 {
-                  q: 'What languages are supported?',
-                  a: 'Currently supports JavaScript, TypeScript, Python, and Go. More coming soon.',
+                  q: 'Which AI model powers it?',
+                  a: 'By default, DeepSeek V3.2 via NVIDIA NIM. Set your NIM_API_KEY in .env and you\'re live — no local GPU, no Ollama setup. You can also swap in any OpenAI-compatible endpoint.',
                 },
                 {
-                  q: 'Can I customize the output?',
-                  a: 'Yes. You can modify templates and add your own patterns.',
+                  q: 'What languages and frameworks are supported?',
+                  a: 'Python (FastAPI, Django, Flask), Node.js (Express, NestJS), Go, TypeScript + React. The stack detector reads your prompt and chooses — or you can be explicit.',
                 },
                 {
-                  q: 'Is it really free?',
-                  a: 'Yes. The core tool is open source and free forever.',
+                  q: 'Can I use it for a real client project?',
+                  a: 'Plenty of people do. Treat the output the same way you\'d treat a senior dev\'s first draft — review it, customise it, and ship it. The MIT licence means no restrictions.',
+                },
+                {
+                  q: 'Is the free plan actually free?',
+                  a: 'Yes. The core CLI and web IDE are open source (MIT). The paid plans give you higher rate limits, team seats, and hosted deployments — but the engine itself is always free.',
                 },
               ].map((faq, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
+                  transition={{ delay: i * 0.07 }}
+                  className="py-6"
                 >
-                  <Card className="p-6 bg-card border border-border shadow-sm">
-                    <h3 className="text-lg font-semibold mb-2 text-foreground">{faq.q}</h3>
-                    <p className="text-muted-foreground">{faq.a}</p>
-                  </Card>
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2 flex items-start gap-3">
+                    <span className="text-primary/50 font-mono text-sm mt-1 shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                    {faq.q}
+                  </h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed pl-8">{faq.a}</p>
                 </motion.div>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="careers" className="relative py-16 sm:py-24 md:py-32 px-4 sm:px-6 bg-muted/50">
-          <div className="max-w-4xl mx-auto text-center">
-            <motion.h2
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-8 text-foreground"
-            >
-              Ready to build?
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              className="text-base sm:text-lg md:text-xl text-muted-foreground mb-8 sm:mb-12 px-2"
-            >
-              Join thousands of developers shipping faster with Vibecoder
-            </motion.p>
+        <section id="careers" className="relative py-20 sm:py-32 px-4 sm:px-6 overflow-hidden">
+          {/* subtle radial glow */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          >
+            <div className="w-[600px] h-[400px] rounded-full opacity-20 blur-[100px]" style={{ background: 'radial-gradient(ellipse, #6366f1 0%, transparent 70%)' }} />
+          </div>
+
+          <div className="relative max-w-3xl mx-auto text-center">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-2"
+              transition={{ duration: 0.6 }}
             >
-              <Link to="/signup">
-                <Button size="lg" className="text-base sm:text-lg px-6 sm:px-8 w-full sm:w-auto min-h-[44px] touch-manipulation">
-                  Get Started Free
-                </Button>
-              </Link>
-              <a
-                href="https://github.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'text-base sm:text-lg px-6 sm:px-8 inline-flex w-full sm:w-auto justify-center min-h-[44px] touch-manipulation')}
-              >
-                View on GitHub
-              </a>
+              <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary/70 mb-6">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                Open beta · free to start
+              </span>
+              <h2 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-foreground mb-6">
+                Stop describing code.<br />
+                <span style={{ background: 'linear-gradient(135deg, #6366f1, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                  Start shipping it.
+                </span>
+              </h2>
+              <p className="text-muted-foreground text-lg sm:text-xl mb-10 max-w-xl mx-auto leading-relaxed">
+                One prompt. Seven agents. A production-ready codebase in minutes — not days.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+                <Link to="/signup">
+                  <Button
+                    size="lg"
+                    className="text-base sm:text-lg px-8 h-12 w-full sm:w-auto font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow"
+                  >
+                    Build something now
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </Link>
+                <a
+                  href="https://github.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants({ variant: 'outline', size: 'lg' }),
+                    'text-base sm:text-lg px-8 h-12 inline-flex w-full sm:w-auto justify-center gap-2 font-medium'
+                  )}
+                >
+                  <Github className="w-4 h-4" />
+                  Star on GitHub
+                </a>
+              </div>
+
+              <p className="mt-8 text-xs text-muted-foreground/50">No credit card. MIT licence. Works with your own NIM key.</p>
             </motion.div>
           </div>
         </section>
@@ -988,7 +1169,7 @@ const VibeCober: React.FC = () => {
                     { name: 'Coder', status: 'pending', icon: '⚙️' },
                     { name: 'Tester', status: 'pending', icon: '🧪' },
                     { name: 'Deployer', status: 'pending', icon: '🚀' },
-                  ].map((agent, i) => (
+                  ].map((agent, _i) => (
                     <div
                       key={agent.name}
                       className={cn(
