@@ -17,3 +17,6 @@ from backend.models.agent import Agent, AgentStatus
 from backend.models.agent_message import AgentMessage, MessageType, SenderType
 from backend.models.project_run import ProjectRun, RunStatus
 from backend.models.artifact import Artifact, ArtifactType
+
+# NIM multi-agent system models (Phase 5)
+from backend.models.nim_run import NimProject, NimDagSnapshot, NimTask, NimTaskOutput, NimAgentLog

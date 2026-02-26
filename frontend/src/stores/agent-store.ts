@@ -21,6 +21,7 @@ export interface Agent {
   lastActivity?: string;
   tokenUsage?: number;
   cost?: number;
+  model?: string;   // NIM model name (e.g., "Nemotron 49B")
 }
 
 export interface AgentMessage {
@@ -72,65 +73,62 @@ interface AgentStore {
   reset: () => void;
 }
 
-// Default agents matching the backend roles
+// Default agents — IDs and names match NIM streaming roles exactly
+// so updateAgent(event.agent, ...) works directly from nim-ws.ts
 const DEFAULT_AGENTS: Agent[] = [
   {
-    id: '1',
-    name: 'team_leader',
+    id: 'team_lead',
+    name: 'team_lead',
     profile: 'Team Leader',
-    goal: 'Coordinate the team',
+    goal: 'Plan work and coordinate the team',
     icon: 'crown',
     color: '#f59e0b',
     state: 'idle',
+    model: 'Nemotron 49B',
   },
   {
-    id: '2',
-    name: 'product_manager',
-    profile: 'Product Manager',
-    goal: 'Define requirements',
-    icon: 'clipboard-list',
-    color: '#8b5cf6',
+    id: 'database_engineer',
+    name: 'database_engineer',
+    profile: 'Database Engineer',
+    goal: 'Design schema and data models',
+    icon: 'database',
+    color: '#3b82f6',
     state: 'idle',
+    model: 'Llama 3.3 70B',
   },
   {
-    id: '3',
-    name: 'architect',
-    profile: 'Architect',
-    goal: 'Design the system',
-    icon: 'layers',
-    color: '#06b6d4',
-    state: 'idle',
-  },
-  {
-    id: '4',
-    name: 'engineer',
-    profile: 'Engineer',
-    goal: 'Write code',
-    icon: 'code-2',
+    id: 'backend_engineer',
+    name: 'backend_engineer',
+    profile: 'Backend Engineer',
+    goal: 'Build API and business logic',
+    icon: 'server',
     color: '#22c55e',
     state: 'idle',
+    model: 'Devstral 123B',
   },
   {
-    id: '5',
+    id: 'frontend_engineer',
+    name: 'frontend_engineer',
+    profile: 'Frontend Engineer',
+    goal: 'Build UI and user experience',
+    icon: 'layout',
+    color: '#06b6d4',
+    state: 'idle',
+    model: 'Qwen 2.5 Coder 32B',
+  },
+  {
+    id: 'qa_engineer',
     name: 'qa_engineer',
     profile: 'QA Engineer',
-    goal: 'Test and review',
+    goal: 'Validate and ensure quality',
     icon: 'shield-check',
     color: '#f97316',
     state: 'idle',
-  },
-  {
-    id: '6',
-    name: 'devops',
-    profile: 'DevOps',
-    goal: 'Deploy and monitor',
-    icon: 'rocket',
-    color: '#ef4444',
-    state: 'idle',
+    model: 'QWQ 32B',
   },
 ];
 
-export const useAgentStore = create<AgentStore>((set, get) => ({
+export const useAgentStore = create<AgentStore>((set) => ({
   agents: DEFAULT_AGENTS,
   activeAgent: null,
   messages: [],

@@ -22,9 +22,11 @@ import logging
 
 logger = logging.getLogger("metagpt_engine")
 
-# NVIDIA NIM API (OpenAI-compatible)
+# NVIDIA NIM — Kimi K2 Thinking (moonshotai/kimi-k2-thinking)
 NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
-NIM_CODE_MODEL = "minimaxai/minimax-m2.1"
+KIMI_BASE_URL = NIM_BASE_URL  # alias
+KIMI_MODEL = "moonshotai/kimi-k2-thinking"
+NIM_CODE_MODEL = KIMI_MODEL  # backward-compat alias
 
 router = APIRouter(prefix="/api/agent", tags=["metagpt"])
 
@@ -110,15 +112,18 @@ RESPOND WITH JSON ARRAY ONLY:"""
         
         # Create context and action
         # Use NVIDIA NIM when NIM_API_KEY is set; else fall back to config2.yaml
-        api_key = os.getenv("NIM_API_KEY", "").strip()
-        print("[DEBUG] NIM_API_KEY set:", bool(api_key))
+        api_key = (
+            os.getenv("NIM_API_KEY", "").strip()
+            or os.getenv("NVIDIA_API_KEY", "").strip()
+        )
+        logger.debug("NIM_API_KEY set: %s", bool(api_key))
         if api_key:
             from metagpt.config2 import Config
             llm_config = {
                 "api_type": "openai",
-                "base_url": NIM_BASE_URL,
+                "base_url": KIMI_BASE_URL,
                 "api_key": api_key,
-                "model": os.getenv("NIM_MODEL", NIM_CODE_MODEL),
+                "model": os.getenv("NIM_MODEL", os.getenv("KIMI_MODEL", KIMI_MODEL)),
                 "temperature": 0.2,
                 "top_p": 0.7,
             }
@@ -128,10 +133,8 @@ RESPOND WITH JSON ARRAY ONLY:"""
         ctx = Context(config=config)
         action = WriteCode(context=ctx)
 
-        model_name = os.getenv("NIM_MODEL", NIM_CODE_MODEL)
-        print("[DEBUG] ABOUT TO CALL NIM")
-        print("[DEBUG] Model:", model_name)
-        print("[DEBUG] Prompt:\n", full_prompt[:1000])
+        model_name = os.getenv("NIM_MODEL", os.getenv("KIMI_MODEL", KIMI_MODEL))
+        logger.debug("Calling Kimi model=%s", model_name)
 
         async def generate():
             result = await action.run(Message(content=full_prompt))
@@ -141,7 +144,7 @@ RESPOND WITH JSON ARRAY ONLY:"""
         result = await generate()
         raw_output = str(result)
 
-        print("[DEBUG] RAW MODEL OUTPUT:\n", raw_output)
+        logger.debug("Raw model output length: %s", len(raw_output))
 
         # Try to extract JSON from the response
         import re
@@ -163,17 +166,16 @@ RESPOND WITH JSON ARRAY ONLY:"""
                             if isinstance(c, dict) and "path" in c and "content" in c
                         ]
                         if valid_changes:
-                            print(f"[DEBUG] Parsed {len(valid_changes)} file changes")
+                            logger.debug("Parsed %s file changes", len(valid_changes))
                             return valid_changes
                 except json.JSONDecodeError:
                     continue
 
-        print("[FATAL] Model returned output but JSON parse failed")
-        print(raw_output)
+        logger.error("Model output JSON parse failed; output length=%s", len(raw_output))
         raise RuntimeError("JSON parse failed")
-        
+
     except Exception as e:
-        print("[FATAL] MetaGPT crashed:", e)
+        logger.exception("MetaGPT run failed: %s", e)
         raise
 
 
@@ -192,7 +194,7 @@ async def run_metagpt_endpoint(request: AgentRequest) -> List[FileChange]:
     Output:
     - Array of { path, content } changes
     """
-    print("[DEBUG] ENDPOINT HIT /api/agent/metagpt")
+    logger.debug("Endpoint /api/agent/metagpt called")
     try:
         changes = await run_metagpt_once(
             system_prompt=request.systemPrompt,

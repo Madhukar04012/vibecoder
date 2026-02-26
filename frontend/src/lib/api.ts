@@ -8,6 +8,9 @@ import { getStoredToken } from "@/lib/auth-storage";
 const API_BASE =
   import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? "" : "http://127.0.0.1:8000");
 
+/** Default request timeout in milliseconds. */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 export function getApiUrl(path: string): string {
   const base = API_BASE.replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
@@ -18,32 +21,54 @@ export interface ApiError {
   detail: string | { msg?: string; loc?: string[] }[];
 }
 
+export interface ApiFetchOptions extends RequestInit {
+  /** Request timeout in milliseconds (default: 30 000). */
+  timeoutMs?: number;
+}
+
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: ApiFetchOptions = {}
 ): Promise<T> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options;
   const url = getApiUrl(path);
   const token = getStoredToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...((options.headers as Record<string, string>) || {}),
+    ...((fetchOptions.headers as Record<string, string>) || {}),
   };
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  // AbortController: merge caller's signal with a timeout signal
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+  // If the caller passed a signal, abort on either the caller's signal or timeout
+  const callerSignal = fetchOptions.signal;
+  if (callerSignal) {
+    callerSignal.addEventListener("abort", () => timeoutController.abort(), { once: true });
+  }
+
   let res: Response;
   try {
     res = await fetch(url, {
-      ...options,
-      headers: { ...headers, ...options.headers },
+      ...fetchOptions,
+      headers: { ...headers, ...fetchOptions.headers },
+      signal: timeoutController.signal,
     });
   } catch (fetchErr) {
+    if (timeoutController.signal.aborted && !callerSignal?.aborted) {
+      throw new Error(`Request timed out after ${timeoutMs}ms: ${path}`);
+    }
     const msg = (fetchErr as Error)?.message ?? String(fetchErr);
     if (msg === "Failed to fetch" || msg.includes("NetworkError") || msg.includes("Load failed")) {
       throw new Error("Cannot connect to server. Is the backend running at " + url + "?");
     }
     throw fetchErr;
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!res.ok) {

@@ -8,6 +8,7 @@ Uses Decimal for precise financial calculations.
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from dataclasses import dataclass
 from datetime import date
@@ -16,6 +17,8 @@ from pathlib import Path
 from typing import Dict, Optional, Union
 from decimal import Decimal, ROUND_HALF_UP
 import os
+
+logger = logging.getLogger(__name__)
 
 
 class TokenTier(str, Enum):
@@ -42,7 +45,10 @@ class TokenGovernance:
     def __init__(self, path: Path | None = None):
         self.path = path or Path("run_logs") / "token_governance.json"
         self._lock = threading.Lock()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            logger.error("Cannot create token governance directory: %s", self.path.parent)
 
     def _today(self) -> str:
         return date.today().isoformat()
@@ -53,11 +59,15 @@ class TokenGovernance:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
             return data if isinstance(data, dict) else {}
-        except Exception:
+        except Exception as e:
+            logger.warning("Token governance _read failed: %s", e)
             return {}
 
     def _write(self, payload: Dict[str, Dict[str, Dict[str, float | str]]]) -> None:
-        self.path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        try:
+            self.path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except (PermissionError, OSError) as e:
+            logger.error("Failed to write token governance data: %s", e)
 
     def _normalize_tier(self, tier: str | TokenTier | None) -> TokenTier:
         if isinstance(tier, TokenTier):

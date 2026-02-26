@@ -10,23 +10,23 @@
 type FlushFn = (path: string, chunk: string) => void;
 
 // ── Speed tuning ─────────────────────────────────────────────────────────────
-// CHARS_PER_TICK × (1000 / TICK_MS) = chars/sec
-// 16 × (1000 / 8) = 2000 chars/sec  →  ~0.5 s for a 1 000-char file
-const CHARS_PER_TICK = 16;
-const TICK_MS = 8;
+// CHARS_PER_TICK dripped per animation frame (~60fps = 16ms)
+// 48 × 60 = ~2880 chars/sec  →  ~0.35s for a 1 000-char file
+// Fewer, larger Zustand updates = less React re-render pressure
+const CHARS_PER_TICK = 48;
 
 class LiveWriterEngine {
   /** Pending text per file path */
   private buffers = new Map<string, string>();
-  /** Interval handle */
-  private timer: ReturnType<typeof setInterval> | null = null;
+  /** RAF handle */
+  private rafId: number | null = null;
   /** Callback that actually writes into the Zustand store */
   private onFlush: FlushFn | null = null;
 
   // ── Public API ──────────────────────────────────────────────────────────
 
-  /** Register the callback that appends content to the store */
-  setFlushCallback(cb: FlushFn): void {
+  /** Register the callback that appends content to the store. Pass null to clear. */
+  setFlushCallback(cb: FlushFn | null): void {
     this.onFlush = cb;
   }
 
@@ -70,20 +70,27 @@ class LiveWriterEngine {
   // ── Internals ───────────────────────────────────────────────────────────
 
   private ensureRunning(): void {
-    if (this.timer) return;
-    this.timer = setInterval(() => this.tick(), TICK_MS);
+    if (this.rafId !== null) return;
+    this.rafId = requestAnimationFrame(() => this.loop());
+  }
+
+  private loop(): void {
+    this.rafId = null;
+    this.tick();
+    if (this.buffers.size > 0) {
+      this.rafId = requestAnimationFrame(() => this.loop());
+    }
   }
 
   private stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
     }
   }
 
   private tick(): void {
     if (!this.onFlush || this.buffers.size === 0) {
-      this.stop();
       return;
     }
 
@@ -93,9 +100,15 @@ class LiveWriterEngine {
         continue;
       }
 
-      // Drain CHARS_PER_TICK characters
-      const chunk = buf.slice(0, CHARS_PER_TICK);
-      const rest = buf.slice(CHARS_PER_TICK);
+      // Adaptive drip speed: scale up for large buffers to avoid long drains
+      // Base: 48 chars/tick. For buffers > 5k, increase proportionally.
+      const adaptiveChars = buf.length > 5000
+        ? Math.min(buf.length, Math.max(CHARS_PER_TICK, Math.ceil(buf.length / 60)))
+        : Math.min(CHARS_PER_TICK, buf.length);
+
+      // Drain adaptiveChars characters
+      const chunk = buf.slice(0, adaptiveChars);
+      const rest = buf.slice(adaptiveChars);
 
       this.onFlush(path, chunk);
 
@@ -105,8 +118,6 @@ class LiveWriterEngine {
         this.buffers.delete(path);
       }
     }
-
-    if (this.buffers.size === 0) this.stop();
   }
 
   /** Flush an entire file buffer at once */

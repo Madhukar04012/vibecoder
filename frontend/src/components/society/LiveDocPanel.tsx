@@ -5,7 +5,7 @@
  *  1. Thinking lines appear one by one while the LLM is generating
  *  2. Document content types character-by-character when the doc arrives
  */
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { subscribeToRun, type WsMessage } from "@/lib/society-api";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -62,7 +62,6 @@ export function LiveDocPanel({ runId, onDocumentReady }: Props) {
   // ── Active document being typed ───────────────────────────────────────
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
   const [activeDocTitle, setActiveDocTitle] = useState<string>("");
-  const [activeDocId, setActiveDocId] = useState<string>("");
   const [liveContent, setLiveContent] = useState<string>("");
   const bufferRef = useRef<string>("");
   const isTypingRef = useRef(false);
@@ -79,7 +78,6 @@ export function LiveDocPanel({ runId, onDocumentReady }: Props) {
 
   // ── Phase label for header ────────────────────────────────────────────
   const [phase, setPhase] = useState<"idle" | "thinking" | "typing" | "done">("idle");
-  const [runDone, setRunDone] = useState(false);
 
   // ── Scroll refs ───────────────────────────────────────────────────────
   const thinkingEndRef = useRef<HTMLDivElement>(null);
@@ -126,7 +124,6 @@ export function LiveDocPanel({ runId, onDocumentReady }: Props) {
           if (!msg.agent || !msg.doc_id) break;
           setPhase("typing");
           setActiveAgent(msg.agent);
-          setActiveDocId(msg.doc_id);
           setActiveDocTitle(msg.title ?? "Document");
           setLiveContent("");
           bufferRef.current = "";
@@ -171,7 +168,6 @@ export function LiveDocPanel({ runId, onDocumentReady }: Props) {
         case "status": {
           const d = msg.data as { status?: string } | undefined;
           if (d?.status === "complete" || d?.status === "failed") {
-            setRunDone(true);
             setPhase("done");
           }
           break;

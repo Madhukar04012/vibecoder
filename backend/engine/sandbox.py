@@ -22,6 +22,7 @@ Usage:
         print(result.stdout)
 """
 
+import logging
 import os
 import shutil
 import subprocess
@@ -36,6 +37,8 @@ from pathlib import Path
 from contextlib import contextmanager
 
 from backend.engine.events import get_event_emitter, EngineEventType
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Constants ───────────────────────────────────────────────────────────────
@@ -362,8 +365,8 @@ class Sandbox:
         """Remove the sandbox directory."""
         try:
             shutil.rmtree(self.path, ignore_errors=True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Sandbox cleanup failed: %s", e)
     
     def get_status(self) -> dict:
         """Get sandbox status."""

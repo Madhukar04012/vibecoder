@@ -47,8 +47,26 @@ MODEL_PRICING: Dict[str, ModelPricing] = {
     "meta/llama-3.3-70b-instruct": ModelPricing(0.0008, 0.0008, "nvidia"),
     "meta/llama-3.1-405b-instruct": ModelPricing(0.005, 0.005, "nvidia"),
     
-    # NIM/DeepSeek (pipeline default; pricing may vary by tier)
+    # Kimi K2 Thinking via NVIDIA NIM (moonshotai)
+    "moonshotai/kimi-k2-thinking": ModelPricing(0.0, 0.0, "nvidia"),
+    "moonshotai/kimi-k2.5": ModelPricing(0.0, 0.0, "nvidia"),
+    "kimi-k2.5": ModelPricing(0.0, 0.0, "nvidia"),
+    "kimi-k2": ModelPricing(0.0, 0.0, "nvidia"),
+
+    # High-Performance Multi-Model Stack (NVIDIA NIM)
+    "nvidia/llama-3.3-nemotron-super-49b-v1": ModelPricing(0.0, 0.0, "nvidia"),
+    "mistralai/devstral-2-123b-instruct-2512": ModelPricing(0.0, 0.0, "nvidia"),
+    "qwen/qwen2.5-coder-32b-instruct": ModelPricing(0.0, 0.0, "nvidia"),
+    "meta/llama-3.3-70b-instruct": ModelPricing(0.0, 0.0, "nvidia"),
     "deepseek-ai/deepseek-v3.2": ModelPricing(0.0, 0.0, "nvidia"),
+    "qwen/qwq-32b": ModelPricing(0.0, 0.0, "nvidia"),
+
+    # Legacy entries kept for backward compat
+    "deepseek-ai/deepseek-v3.2": ModelPricing(0.0, 0.0, "nvidia"),
+    "deepseek-v3.2": ModelPricing(0.0, 0.0, "nvidia"),
+    "deepseek-v3.1-terminus": ModelPricing(0.0, 0.0, "nvidia"),
+    "qwen3-coder-480b-a35b-instruct": ModelPricing(0.0, 0.0, "nvidia"),
+    "qwen3-next-80b-thinking": ModelPricing(0.0, 0.0, "nvidia"),
     "deepseek-coder": ModelPricing(0.0, 0.0, "nvidia"),
 }
 

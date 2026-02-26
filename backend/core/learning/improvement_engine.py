@@ -8,8 +8,11 @@ automatically applies safe optimizations.
 from __future__ import annotations
 
 import json
+import logging
 import asyncio
 from typing import Dict, Any, List, Optional, Callable
+
+logger = logging.getLogger(__name__)
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -359,7 +362,7 @@ Only suggest high-confidence improvements with clear expected impact."""
             return improvements
 
         except Exception as e:
-            print(f"Error generating improvements: {e}")
+            logger.exception("Error generating improvements: %s", e)
             return []
 
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:

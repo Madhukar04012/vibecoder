@@ -84,8 +84,8 @@ class SocietyOrchestrator:
         for cb in self._event_callbacks:
             try:
                 await cb(agent, event, payload)
-            except Exception:
-                pass  # never let callback errors break the pipeline
+            except Exception as e:
+                logger.warning("Society event callback failed: %s", e)
 
     # ------------------------------------------------------------------
     # Agent execution helper with tracing + metrics

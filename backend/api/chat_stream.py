@@ -1,18 +1,34 @@
 """
-AI Code Generation Streaming API — Live Code Writing
+AI Code Generation Streaming API — High-Performance Multi-Model Stack
 Cursor/Bolt-style: AI writes code character-by-character in the editor.
 Multi-agent pipeline: TeamLead → Planner → Coder → Writer
+
+Each agent role uses its optimal model:
+  TeamLead → nvidia/llama-3.3-nemotron-super-49b-v1
+  Coder    → mistralai/devstral-2-123b-instruct-2512 (backend) / qwen/qwen2.5-coder-32b-instruct (frontend)
+  Chat     → nvidia/llama-3.3-nemotron-super-49b-v1
 """
 
 import asyncio
 import json
+import logging
 import os
 import re
 from typing import AsyncGenerator
 
 from fastapi import APIRouter
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+
+from backend.engine.model_config import (
+    get_model_for_role,
+    get_profile,
+    get_chat_model,
+    get_coder_model,
+    get_profile_for_role,
+)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -73,13 +89,33 @@ def _detect_project_type(prompt: str) -> str:
 
 
 
-def _call_nim_for_code(prompt: str, file_path: str, project_context: str = "") -> str | None:
+def _call_nim_for_code(prompt: str, file_path: str, project_context: str = "", role: str = "backend_engineer") -> str | None:
+    """Generate code using the role-specific model for maximum quality."""
     import requests
-    nim_key = os.getenv("NIM_CODER_API_KEY", "").strip() or os.getenv("NIM_API_KEY", "").strip()
+    nim_key = (
+        os.getenv("NIM_API_KEY", "").strip()
+        or os.getenv("NVIDIA_API_KEY", "").strip()
+        or os.getenv("NIM_CODER_API_KEY", "").strip()
+    )
 
     if not nim_key:
         return None
+
+    # Detect if this is a frontend or backend file to route to the right model
     ext = file_path.rsplit(".", 1)[-1] if "." in file_path else ""
+    frontend_exts = {"tsx", "jsx", "ts", "css", "html"}
+    backend_exts = {"py"}
+
+    if ext in frontend_exts or file_path.startswith("frontend/") or file_path.startswith("src/"):
+        effective_role = "frontend_engineer"
+    elif ext in backend_exts or file_path.startswith("backend/"):
+        effective_role = "backend_engineer"
+    else:
+        effective_role = role
+
+    model = get_model_for_role(effective_role)
+    profile = get_profile(model)
+
     lang = {"py": "Python", "ts": "TypeScript", "tsx": "TypeScript React", "js": "JavaScript",
             "jsx": "JavaScript React", "json": "JSON", "css": "CSS", "html": "HTML"}.get(ext, "code")
     system_msg = f"""You are an expert software engineer. Generate the COMPLETE contents of the file '{file_path}' ({lang}).
@@ -91,7 +127,7 @@ Rules:
 - Follow best practices for {lang}"""
     if project_context:
         system_msg += f"\n\nProject context:\n{project_context}"
-    model = os.getenv("NIM_CODER_MODEL", os.getenv("NIM_MODEL", "qwen/qwen2.5-coder-32b-instruct"))
+
     try:
         r = requests.post(
             "https://integrate.api.nvidia.com/v1/chat/completions",
@@ -99,26 +135,32 @@ Rules:
             json={"model": model, "messages": [
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": f"User request: {prompt}\n\nGenerate the complete file: {file_path}"},
-            ], "max_tokens": 8192, "temperature": 0.2, "top_p": 0.7},
+            ], "max_tokens": profile.max_tokens, "temperature": profile.temperature, "top_p": profile.top_p},
             timeout=60,
         )
         r.raise_for_status()
         content = r.json().get("choices", [{}])[0].get("message", {}).get("content", "")
         content = re.sub(r'^```\w*\n?', '', content.strip())
         content = re.sub(r'\n?```$', '', content.strip())
+        logger.info("[NIM] Code gen: file=%s model=%s role=%s", file_path, model, effective_role)
         return content.strip() if content.strip() else None
     except Exception as e:
-        print(f"[NIM] Code gen error for {file_path}: {e}")
+        logger.warning("[NIM] Code gen error for %s (model=%s): %s", file_path, model, e)
         return None
 
 
 def _call_nim_chat(prompt: str, context: str = "") -> str | None:
+    """Use the team_lead model (Nemotron Super) for chat responses — fast and articulate."""
     import requests
-    nim_key = os.getenv("NIM_API_KEY", "").strip()
+    nim_key = (
+        os.getenv("NIM_API_KEY", "").strip()
+        or os.getenv("NVIDIA_API_KEY", "").strip()
+    )
 
     if not nim_key:
         return None
-    model = os.getenv("NIM_MODEL", "minimaxai/minimax-m2.1")
+    model = get_chat_model()
+    profile = get_profile(model)
     system_msg = "You are a helpful AI coding assistant in an IDE. Be concise and helpful."
     if context:
         system_msg += f"\n\nCurrent project files:\n{context}"
@@ -129,12 +171,14 @@ def _call_nim_chat(prompt: str, context: str = "") -> str | None:
             json={"model": model, "messages": [
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": prompt},
-            ], "max_tokens": 8192, "temperature": 1, "top_p": 0.95},
-            timeout=30,
+            ], "max_tokens": 8192, "temperature": profile.temperature, "top_p": profile.top_p},
+            timeout=60,
         )
         r.raise_for_status()
+        logger.info("[NIM] Chat response: model=%s", model)
         return r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip() or None
-    except Exception:
+    except Exception as e:
+        logger.warning("[NIM] Chat error (model=%s): %s", model, e)
         return None
 
 
@@ -153,8 +197,8 @@ def _is_code_request(prompt: str) -> bool:
 
 # ─── Live Code Writing Speed ─────────────────────────────────────────────────
 # Characters per chunk for live typing effect (higher = faster)
-TYPING_CHARS_PER_CHUNK = 32
-TYPING_DELAY_MS = 0.003  # delay between chunks in seconds
+TYPING_CHARS_PER_CHUNK = 64
+TYPING_DELAY_MS = 0.001  # delay between chunks in seconds
 
 
 # ─── Stream Generator with Live Code Writing ─────────────────────────────────
@@ -193,7 +237,7 @@ async def stream_generator(prompt: str, existing_files: dict) -> AsyncGenerator[
                 "icon": "brain",
                 "description": "Analyzing requirements...",
             })
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.1)
 
             project_type = _detect_project_type(prompt)
             template = TEMPLATES.get(project_type, TEMPLATES["react"])
@@ -203,7 +247,7 @@ async def stream_generator(prompt: str, existing_files: dict) -> AsyncGenerator[
                 "agent": "team_lead",
                 "result": f"Identified {project_type.replace('_', ' ')} project with {len(file_list)} files",
             })
-            await asyncio.sleep(0.15)
+            await asyncio.sleep(0.05)
 
             # ── Agent 2: Planner ──────────────────────────────────────
             yield event("agent_start", {
@@ -212,7 +256,7 @@ async def stream_generator(prompt: str, existing_files: dict) -> AsyncGenerator[
                 "icon": "map",
                 "description": "Designing project architecture...",
             })
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.05)
 
             # Build context from existing files
             ctx_parts = [f"- {p}" for p in list(existing_files.keys())[:10]]
@@ -223,7 +267,7 @@ async def stream_generator(prompt: str, existing_files: dict) -> AsyncGenerator[
                 "agent": "planner",
                 "result": plan_text,
             })
-            await asyncio.sleep(0.15)
+            await asyncio.sleep(0.05)
 
             # ── Agent 3: Coder — generates and LIVE-WRITES each file ─
             yield event("agent_start", {
@@ -232,7 +276,7 @@ async def stream_generator(prompt: str, existing_files: dict) -> AsyncGenerator[
                 "icon": "code",
                 "description": "Writing code...",
             })
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.02)
 
             yield event("message", {
                 "content": f"Building your {project_type.replace('_', ' ')} project. Watch the code appear live in the editor...",

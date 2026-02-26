@@ -2,7 +2,7 @@
  * Document Viewer with approval flow — plan IDE Frontend Phase 1.3
  * Renders markdown content, supports approve / request-changes flow.
  */
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { DocumentResponse } from "@/lib/society-api";
 import { approveDocument, documentFeedback } from "@/lib/society-api";
 import { Button } from "@/components/ui/button";

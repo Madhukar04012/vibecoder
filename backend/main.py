@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +17,8 @@ import logging
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+
+from backend.auth.dependencies import get_current_user
 
 # Configure structured logging
 _env = os.getenv("ENV", "development").lower()
@@ -57,11 +59,14 @@ from backend.api.atmos import router as atmos_router
 from backend.api.pipeline_governance import router as pipeline_governance_router
 from backend.api.agent_chat import router as agent_chat_router
 from backend.api.society import router as society_router
+from backend.api.nim_ws import router as nim_ws_router
+from backend.api.nim_test import router as nim_test_router
 
 # Import all models to ensure they're registered
 from backend.models import (
     User, Project, ProjectAgent, ProjectPlan, Conversation, Task, ExecutionLog,
-    Agent, AgentMessage, ProjectRun, Artifact
+    Agent, AgentMessage, ProjectRun, Artifact,
+    NimProject, NimDagSnapshot, NimTask, NimTaskOutput, NimAgentLog,
 )
 
 logger = logging.getLogger("vibecober")
@@ -140,8 +145,12 @@ else:
     # Development: allow localhost variants
     _cors_list = [
         "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
         "http://127.0.0.1:3000",
     ]
     logger.info(f"Development mode: allowing CORS from localhost: {_cors_list}")
@@ -149,9 +158,9 @@ else:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_list,
-    allow_credentials=True,  # Always enable credentials with explicit origins
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 
 # Include routers (original)
@@ -208,6 +217,12 @@ app.include_router(pipeline_governance_router)
 app.include_router(agent_chat_router)
 app.include_router(society_router)
 
+# NIM Multi-Agent System — Phase 4: WebSocket streaming
+app.include_router(nim_ws_router)
+
+# NIM Multi-Agent System — Model connectivity test + config
+app.include_router(nim_test_router)
+
 
 # ---------- Global exception handler ----------
 
@@ -226,22 +241,22 @@ def api_status():
 
 
 @app.get("/api/circuit-breakers")
-def circuit_breaker_status():
-    """Get status of all circuit breakers."""
+def circuit_breaker_status(current_user: User = Depends(get_current_user)):
+    """Get status of all circuit breakers (auth required)."""
     from backend.engine.circuit_breaker import get_all_breaker_statuses
     return {"breakers": get_all_breaker_statuses()}
 
 
 @app.get("/api/race-mode/history")
-def race_mode_history():
-    """Get race mode execution history."""
+def race_mode_history(current_user: User = Depends(get_current_user)):
+    """Get race mode execution history (auth required)."""
     from backend.engine.race_mode import get_race_mode
     return {"races": get_race_mode().get_history()}
 
 
 @app.get("/api/prompt-optimizer/stats")
-def optimizer_stats():
-    """Get prompt optimizer statistics."""
+def optimizer_stats(current_user: User = Depends(get_current_user)):
+    """Get prompt optimizer statistics (auth required)."""
     from backend.engine.prompt_optimizer import get_prompt_optimizer
     return {"stats": get_prompt_optimizer().get_stats()}
 

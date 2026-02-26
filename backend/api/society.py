@@ -392,8 +392,8 @@ async def websocket_updates(websocket: WebSocket, run_id: str) -> None:
     st = _run_status.get(run_id, {"status": "unknown", "doc_ids": []})
     try:
         await websocket.send_text(json.dumps({"type": "status", "data": st}))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("[Society] Failed to send initial status: %s", e)
 
     try:
         while True:
@@ -404,9 +404,9 @@ async def websocket_updates(websocket: WebSocket, run_id: str) -> None:
                 # Send server-side ping to keep connection alive
                 await websocket.send_text(json.dumps({"type": "ping"}))
     except WebSocketDisconnect:
-        pass
-    except Exception:
-        pass
+        logger.info("[Society] WS client disconnected: run_id=%s", run_id)
+    except Exception as e:
+        logger.exception("[Society] WS error: %s", e)
     finally:
         _active_ws.get(run_id, set()).discard(websocket)
 

@@ -11,6 +11,14 @@ export default defineConfig({
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
       },
+      // ── WebSocket proxy — routes /ws/* to FastAPI backend ──────────────────
+      // Without this, ws://localhost:5173/ws/nim/... hits the Vite dev server
+      // (which has no WS handler) and the connection fails immediately.
+      "/ws": {
+        target: "ws://127.0.0.1:8000",
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
   resolve: {

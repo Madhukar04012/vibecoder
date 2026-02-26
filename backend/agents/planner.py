@@ -3,9 +3,12 @@ Planner Agent - Decides project architecture
 Now powered by AI with safe fallback to prompt-aware response
 """
 
+import logging
 
 from backend.core.llm_client import nim_chat
 from backend.core.tech_detector import detect_stack
+
+logger = logging.getLogger(__name__)
 
 
 def _build_fallback(user_idea: str) -> dict:
@@ -126,11 +129,11 @@ JSON:'''
         # Validate response has required keys
         required_keys = ["project_type", "backend", "frontend", "database", "modules"]
         if all(k in ai_response for k in required_keys):
-            print("[PLANNER] Using AI-generated architecture")
+            logger.info("Using AI-generated architecture")
             return ai_response
         else:
-            print("[PLANNER] AI response missing keys, using fallback")
+            logger.warning("AI response missing required keys, using fallback")
 
     # Fallback if AI fails — now prompt-aware
-    print("[PLANNER] Using fallback architecture")
+    logger.info("Using fallback architecture")
     return _build_fallback(user_idea)

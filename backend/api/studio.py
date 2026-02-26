@@ -285,8 +285,8 @@ Rules:
                     runCommands=run,
                 ),
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Planner parse failed, using fallback plan: %s", e)
 
     return PlanSchema(
         summary=f"Plan for: {prompt[:100]}...",
@@ -365,8 +365,8 @@ Rules:
                 elif t == "delete" and "search" in d:
                     diffs.append({"type": "delete", "file": f, "search": str(d["search"])})
             return DiffPlanSchema(summary=summary, diffs=diffs)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Diff agent LLM failed: %s", e)
 
     return DiffPlanSchema(summary=plan.summary, diffs=[])
 
@@ -450,8 +450,8 @@ FAILURE BEHAVIOR:
             raw = result.get("content", "")
             if isinstance(raw, str):
                 return raw.replace("\\n", "\n")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Engineer LLM failed for %s: %s", file_path, e)
 
     return f"# {file_path}\n# Generated placeholder\n# Plan: {plan.summary}\n"
 
@@ -603,7 +603,7 @@ CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Send a message to the AI team and get responses (NIM/DeepSeek pipeline)."""
+    """Send a message to the AI team and get responses (Kimi K2.5 pipeline)."""
     from backend.core.llm_client import nim_chat
 
     prompt = f"You are a helpful coding assistant. The user said: {request.message}\n\nRespond briefly and helpfully."
@@ -619,7 +619,7 @@ async def chat(request: ChatRequest):
     return ChatResponse(
         messages=[ChatMessage(
             agent="assistant",
-            content=f"Sure! You said: \"{request.message}\". (Set NIM_API_KEY in .env for AI replies via DeepSeek/NIM.)",
+            content=f"Sure! You said: \"{request.message}\". (Set NIM_API_KEY in .env for AI replies via Kimi K2.5 on NVIDIA NIM.)",
             type="text"
         )],
         finished=True
@@ -779,11 +779,12 @@ async def preview_start(request: PreviewStartRequest):
         try:
             _preview_processes[project_id].terminate()
             _preview_processes[project_id].wait(timeout=3)
-        except Exception:
+        except Exception as e:
+            logger.debug("Preview terminate failed: %s", e)
             try:
                 _preview_processes[project_id].kill()
-            except Exception:
-                pass
+            except Exception as kill_err:
+                logger.debug("Preview kill failed: %s", kill_err)
         del _preview_processes[project_id]
         _preview_ports.pop(project_id, None)
 

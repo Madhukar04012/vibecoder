@@ -6,6 +6,11 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import "./index.css";
 
+// Log unhandled promise rejections so they are visible (no silent failures)
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("[Unhandled rejection]", event.reason);
+});
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ErrorBoundary>

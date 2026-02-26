@@ -42,7 +42,7 @@ export interface ChatFileItem {
   status: ChatFileStatus;
 }
 
-export type ChatMessageType = 'chat' | 'discussion' | 'agent_status' | 'agent_result' | 'event_card';
+export type ChatMessageType = 'chat' | 'discussion' | 'agent_status' | 'agent_result' | 'event_card' | 'thinking' | 'code' | 'status' | 'error' | 'progress' | 'done';
 
 export interface ChatMessage {
   id: string;
@@ -58,6 +58,8 @@ export interface ChatMessage {
   // Event card fields (Atmos-style pipeline events)
   eventType?: string;       // "run_started", "budget_configured", "execution_plan", etc.
   eventData?: Record<string, any>; // structured payload for event cards
+  // Delivery status (user messages only)
+  deliveryStatus?: 'pending' | 'sent' | 'error';
 }
 
 // ─── File Status ──────────────────────────────────────────────────────────
@@ -128,6 +130,12 @@ interface IDEState {
   addChatMessage: (msg: Omit<ChatMessage, 'id'> & { id?: string }) => void;
   updateLastAssistantMessage: (content: string) => void;
   appendToLastAssistantMessage: (token: string) => void;
+  appendToLastThinkingMessage: (token: string) => void;
+  clearLastThinkingMessage: () => void;
+  markLastThinkingMessageDone: () => void;
+  appendToLastDiscussionMessage: (token: string) => void;
+  markLastDiscussionMessageDone: () => void;
+  updateChatMessage: (id: string, patch: Partial<Omit<ChatMessage, 'id'>>) => void;
   clearChat: () => void;
 
   // AI status + file writing
@@ -149,9 +157,28 @@ interface IDEState {
   addAgentStep: (step: Omit<AgentStep, 'id' | 'status'>) => void;
   completeAgentStep: (agent: string, result?: string) => void;
   clearAgentSteps: () => void;
+
+  // Chat search & filter
+  chatSearchQuery: string;
+  setChatSearchQuery: (q: string) => void;
+  chatAgentFilter: string | null; // null = show all
+  setChatAgentFilter: (agent: string | null) => void;
 }
 
 const makeId = () => Math.random().toString(36).slice(2, 11);
+
+// ─── Store helper ────────────────────────────────────────────────────────────
+// Returns the index of the last assistant message to update tokens into.
+// Prefers the last *streaming* assistant message; falls back to any assistant message.
+function findLastAssistantTarget(messages: ChatMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant' && messages[i].isStreaming) return i;
+  }
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') return i;
+  }
+  return -1;
+}
 
 export const useIDEStore = create<IDEState>((set, get) => ({
   // ─── Editor Tabs ──────────────────────────────────────────────────────────
@@ -161,7 +188,6 @@ export const useIDEStore = create<IDEState>((set, get) => ({
   fileStatuses: {},
 
   openFile: (path) => {
-    const { openFiles, fileContents } = get();
     // Batch all state updates into a single set() to avoid transient inconsistencies
     // Prepend new files at the start so the active file is always the first tab
     set((s) => ({
@@ -301,50 +327,85 @@ export const useIDEStore = create<IDEState>((set, get) => ({
   updateLastAssistantMessage: (content) =>
     set((s) => {
       const next = [...s.chatMessages];
-      let target = -1;
-      for (let i = next.length - 1; i >= 0; i--) {
-        if (next[i].role === 'assistant' && next[i].isStreaming) {
-          target = i;
-          break;
-        }
-      }
-      if (target === -1) {
-        for (let i = next.length - 1; i >= 0; i--) {
-          if (next[i].role === 'assistant') {
-            target = i;
-            break;
-          }
-        }
-      }
-      if (target !== -1) {
-        next[target] = { ...next[target], content };
-      }
+      const target = findLastAssistantTarget(next);
+      if (target !== -1) next[target] = { ...next[target], content };
       return { chatMessages: next };
     }),
 
   appendToLastAssistantMessage: (token) =>
     set((s) => {
       const next = [...s.chatMessages];
-      let target = -1;
+      const target = findLastAssistantTarget(next);
+      if (target !== -1) next[target] = { ...next[target], content: next[target].content + token };
+      return { chatMessages: next };
+    }),
+
+  appendToLastThinkingMessage: (token) =>
+    set((s) => {
+      const next = [...s.chatMessages];
       for (let i = next.length - 1; i >= 0; i--) {
-        if (next[i].role === 'assistant' && next[i].isStreaming) {
-          target = i;
-          break;
+        if (next[i].role === 'assistant' && next[i].messageType === 'thinking' && next[i].isStreaming) {
+          next[i] = { ...next[i], content: next[i].content + token };
+          return { chatMessages: next };
         }
-      }
-      if (target === -1) {
-        for (let i = next.length - 1; i >= 0; i--) {
-          if (next[i].role === 'assistant') {
-            target = i;
-            break;
-          }
-        }
-      }
-      if (target !== -1) {
-        next[target] = { ...next[target], content: next[target].content + token };
       }
       return { chatMessages: next };
     }),
+
+  markLastThinkingMessageDone: () =>
+    set((s) => {
+      const next = [...s.chatMessages];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === 'assistant' && next[i].messageType === 'thinking' && next[i].isStreaming) {
+          next[i] = { ...next[i], isStreaming: false };
+          return { chatMessages: next };
+        }
+      }
+      return { chatMessages: next };
+    }),
+
+  clearLastThinkingMessage: () =>
+    set((s) => {
+      const next = [...s.chatMessages];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === 'assistant' && next[i].messageType === 'thinking' && next[i].isStreaming) {
+          next[i] = { ...next[i], content: '' };
+          return { chatMessages: next };
+        }
+      }
+      return { chatMessages: next };
+    }),
+
+  appendToLastDiscussionMessage: (token) =>
+    set((s) => {
+      const next = [...s.chatMessages];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === 'assistant' && next[i].messageType === 'discussion' && next[i].isStreaming) {
+          next[i] = { ...next[i], content: next[i].content + token };
+          return { chatMessages: next };
+        }
+      }
+      return { chatMessages: next };
+    }),
+
+  markLastDiscussionMessageDone: () =>
+    set((s) => {
+      const next = [...s.chatMessages];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === 'assistant' && next[i].messageType === 'discussion' && next[i].isStreaming) {
+          next[i] = { ...next[i], isStreaming: false };
+          return { chatMessages: next };
+        }
+      }
+      return { chatMessages: next };
+    }),
+
+  updateChatMessage: (id, patch) =>
+    set((s) => ({
+      chatMessages: s.chatMessages.map((m) =>
+        m.id === id ? { ...m, ...patch } : m
+      ),
+    })),
 
   clearChat: () => set({ chatMessages: [] }),
 
@@ -432,6 +493,12 @@ export const useIDEStore = create<IDEState>((set, get) => ({
     })),
 
   clearAgentSteps: () => set({ agentSteps: [] }),
+
+  // Chat search & filter
+  chatSearchQuery: '',
+  setChatSearchQuery: (q) => set({ chatSearchQuery: q }),
+  chatAgentFilter: null,
+  setChatAgentFilter: (agent) => set({ chatAgentFilter: agent }),
 }));
 
 // ─── PERSISTENCE (invisible, no UI coupling) ────────────────────────────────

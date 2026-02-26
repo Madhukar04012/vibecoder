@@ -3,8 +3,11 @@ Auth API Routes - Signup and Login
 Using direct bcrypt (no passlib) for Python 3.12 compatibility
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from backend.database import get_db
 from backend.models.user import User
@@ -12,6 +15,9 @@ from backend.schemas.user import UserCreate, UserLogin, UserResponse, Token
 from backend.auth.jwt import create_access_token
 from backend.auth.dependencies import get_current_user
 from backend.auth.security import hash_password, verify_password
+
+logger = logging.getLogger(__name__)
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -43,24 +49,26 @@ def _create_user(user_data: UserCreate, db: Session) -> User:
 
 
 @router.post("/signup", response_model=UserResponse)
-def signup(user_data: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def signup(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     """Register a new user."""
     return _create_user(user_data, db)
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     """Alias for signup - common API convention for auth."""
     return _create_user(user_data, db)
 
 
 @router.post("/login", response_model=Token)
-def login(user_data: UserLogin, db: Session = Depends(get_db)):
-    """
-    Login and get JWT token.
-    """
+@limiter.limit("10/minute")
+def login(request: Request, user_data: UserLogin, db: Session = Depends(get_db)):
+    """Login and get JWT token."""
     user = db.query(User).filter(User.email == user_data.email).first()
     if not user or not verify_password(user_data.password, user.password_hash):
+        logger.info("Failed login attempt for email=%s", user_data.email[:50])
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

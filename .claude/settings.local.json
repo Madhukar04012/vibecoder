@@ -8,7 +8,14 @@
       "Bash(python -c:*)",
       "Bash(python -m pytest:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Read(//c/Users/annam/vibecober/**)",
+      "Bash(grep:*)",
+      "WebFetch(domain:build.nvidia.com)",
+      "Bash(test:*)",
+      "Bash(python -m py_compile:*)"
     ]
   }
 }

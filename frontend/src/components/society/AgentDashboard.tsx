@@ -2,7 +2,7 @@
  * Live Agent Dashboard — real-time agent status with thinking line display.
  * Shows per-agent thinking lines while the LLM is working.
  */
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { subscribeToRun, type WsMessage } from "@/lib/society-api";
 
 const AGENT_ORDER = [

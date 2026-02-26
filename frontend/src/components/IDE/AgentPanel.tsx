@@ -8,7 +8,8 @@ import { useAgentStore, type Agent, type AgentState } from '@/stores/agent-store
 import { cn } from '@/lib/utils';
 import {
   Crown, ClipboardList, Layers, Code2, ShieldCheck, Rocket,
-  Brain, Loader2, CheckCircle2, AlertCircle, Clock, Pause
+  Brain, Loader2, CheckCircle2, AlertCircle, Clock, Pause,
+  Server, Database, Layout
 } from 'lucide-react';
 
 const ICONS: Record<string, typeof Crown> = {
@@ -19,6 +20,9 @@ const ICONS: Record<string, typeof Crown> = {
   'shield-check': ShieldCheck,
   'rocket': Rocket,
   'brain': Brain,
+  'server': Server,
+  'database': Database,
+  'layout': Layout,
 };
 
 const STATE_CONFIG: Record<AgentState, { icon: typeof Loader2; label: string; animation?: string }> = {
@@ -45,6 +49,7 @@ function AgentAvatar({ agent, isActive, onClick }: AgentAvatarProps) {
   
   return (
     <button
+      type="button"
       onClick={onClick}
       className={cn(
         'relative flex items-center gap-3 w-full px-3 py-2.5 rounded-lg transition-all',
@@ -62,7 +67,6 @@ function AgentAvatar({ agent, isActive, onClick }: AgentAvatarProps) {
         style={{
           backgroundColor: `${agent.color}20`,
           borderColor: agent.color,
-          ringColor: isWorking ? agent.color : undefined,
         }}
       >
         <Icon size={18} style={{ color: agent.color }} />

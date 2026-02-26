@@ -13,6 +13,8 @@
 
 import { create } from 'zustand';
 import { EventBus } from './event-bus';
+import { useStreamStore, toRosterId } from '@/streaming/stream-store';
+import type { Phase } from '@/streaming/phase-engine';
 
 // ─── ATMOS Phases ───────────────────────────────────────────────────────────
 
@@ -239,6 +241,19 @@ export async function runAtmosIntent(intent: string): Promise<void> {
 
 // ─── Event Handler ──────────────────────────────────────────────────────────
 
+// Scoped state per-intent to prevent race conditions when intents overlap.
+// Reset in handleAtmosEvent on 'run_start' or by the store's startIntent().
+const _intentState = {
+    activeAgentId: null as string | null,
+    lastCpId: null as string | null,
+    fileCount: 0,
+    reset() {
+        this.activeAgentId = null;
+        this.lastCpId = null;
+        this.fileCount = 0;
+    },
+};
+
 // Map atoms_engine phases to atmos phases based on agent progress
 function agentToPhase(agent: string): AtmosPhase | null {
     switch (agent) {
@@ -266,82 +281,110 @@ const AGENT_NARRATIVE: Record<string, { name: string; icon: string; thinking: st
     planner: {
         name: 'Planner',
         icon: 'map',
-        thinking: 'I am analyzing your request and turning it into a clear execution plan.',
-        done: 'Planning is complete. The execution order is ready for the team.',
+        thinking: "Alright, let me read through the requirements carefully and figure out exactly what we're building here. I'll map out the full execution sequence so the team knows what to tackle and in what order.",
+        done: 'Planning complete. Execution sequence is locked in — handing off to the team now.',
     },
     db_schema: {
         name: 'Architect',
         icon: 'layers',
-        thinking: 'I am designing the data model and technical structure for this build.',
-        done: 'Architecture and schema decisions are complete.',
+        thinking: "Looking at the requirements now. Let me design the data model — tables, relationships, indexes — and figure out the right technical structure before anyone writes a line of code.",
+        done: 'Data model and schema decisions are done. Architecture is solid.',
     },
     auth: {
         name: 'Engineer',
         icon: 'code',
-        thinking: 'I am wiring authentication and core access controls.',
-        done: 'Authentication layer is implemented and handed off.',
+        thinking: "Wiring up authentication now. JWT tokens, hashed passwords, route protection — I'll make sure access control is airtight before we add any features on top.",
+        done: 'Auth layer is live. Login, registration, and protected routes are implemented.',
     },
     coder: {
         name: 'Engineer',
         icon: 'code',
-        thinking: 'I am generating project files and implementing the requested features.',
-        done: 'Core code generation is complete.',
+        thinking: "Generating the full project now. I'm laying out the folder structure, writing each file based on the architecture, and making sure everything connects cleanly end to end.",
+        done: 'Code generation complete. All files are written and the project structure is ready.',
     },
     code_reviewer: {
         name: 'QA Engineer',
         icon: 'shield',
-        thinking: 'I am reviewing generated code quality, safety, and consistency.',
-        done: 'Code review is complete with findings and recommendations.',
+        thinking: "Reading through the generated code carefully. Checking for bugs, security issues, and anything that doesn't match the spec. I'll flag anything the team needs to fix before shipping.",
+        done: 'Code review done. Findings logged — the build is clean and ready for testing.',
     },
     tester: {
         name: 'QA Engineer',
         icon: 'shield',
-        thinking: 'I am validating behavior and checking for regressions.',
-        done: 'QA checks are complete.',
+        thinking: "Running through the test cases now. I want to make sure every critical path works, edge cases are handled, and nothing obvious is broken before we ship this.",
+        done: 'All tests passed. No regressions. The build is good to go.',
     },
     deployer: {
         name: 'DevOps',
         icon: 'rocket',
-        thinking: 'I am preparing dependencies and runtime deployment.',
-        done: 'Deployment step is complete.',
+        thinking: "Setting up the deployment environment now. Installing dependencies, configuring the runtime, writing the Dockerfile and compose config — making sure this runs cleanly everywhere.",
+        done: 'Deployment config is ready. Docker, dependencies, and runtime are all set up.',
     },
     team_lead: {
         name: 'Team Leader',
         icon: 'crown',
-        thinking: 'I am coordinating agents and managing execution flow.',
-        done: 'Coordination step is complete.',
+        thinking: "I've got the brief. Let me figure out the best approach here — which agents to involve, in what order, and what each person should focus on. I'll keep the team coordinated throughout.",
+        done: "Coordination complete. The team has everything they need — wrapping up execution.",
     },
     pm: {
         name: 'Product Manager',
         icon: 'clipboard',
-        thinking: 'I am refining requirements and scope for execution.',
-        done: 'Requirements are finalized.',
+        thinking: "Digging into the requirements now. I want to make sure we're building the right thing — clear user flows, well-defined features, no ambiguity before the team starts coding.",
+        done: 'Requirements are locked in. The team has a clear, unambiguous spec to work from.',
     },
     architect: {
         name: 'Architect',
         icon: 'layers',
-        thinking: 'I am mapping architecture and component boundaries.',
-        done: 'Architecture design is complete.',
+        thinking: "Thinking through the system design. I need to define how the pieces fit together — frontend, backend, database, APIs, and any external services — before anyone starts building.",
+        done: 'Architecture is defined. Component boundaries are clear and the design is solid.',
     },
     engineer: {
         name: 'Engineer',
         icon: 'code',
-        thinking: 'I am implementing the code now.',
-        done: 'Implementation for this step is complete.',
+        thinking: "Let me get into the code. I'll implement this step by step — following the architecture, keeping the code clean, and making sure everything integrates properly with what's already been built.",
+        done: 'Implementation done. This piece is built, tested, and ready to hand off.',
     },
     qa: {
         name: 'QA Engineer',
         icon: 'shield',
-        thinking: 'I am testing the output for quality and defects.',
-        done: 'Testing step is complete.',
+        thinking: "Going through the output carefully now. I'm checking behavior, looking for edge cases, and making sure the quality bar is high enough to ship.",
+        done: 'QA complete. Everything checks out — no critical issues found.',
     },
     devops: {
         name: 'DevOps',
         icon: 'rocket',
-        thinking: 'I am handling build and deployment setup.',
-        done: 'Build/deploy step is complete.',
+        thinking: "Handling the infrastructure side now. Getting the build pipeline, environment config, and deployment setup sorted — making sure this actually runs in production, not just locally.",
+        done: 'Infrastructure is ready. Build, deploy, and runtime configs are all in place.',
     },
 };
+
+// ─── Agent → Phase mapping ────────────────────────────────────────────────────
+
+function agentToStreamPhase(agentId: string): Phase | null {
+    switch (agentId) {
+        case 'team_lead':
+        case 'planner':
+        case 'pm':
+            return 'planning';
+        case 'architect':
+        case 'db_schema':
+            return 'architecture';
+        case 'engineer':
+        case 'coder':
+        case 'auth':
+            return 'implementation';
+        case 'qa':
+        case 'tester':
+        case 'code_reviewer':
+        case 'deployer':
+        case 'devops':
+            return 'validation';
+        default:
+            return null;
+    }
+}
+
+// lastCpId and fileCount live on _intentState (line 246) to prevent race conditions
 
 function resolveAgentNarrative(agentId: string, payloadName?: string, payloadIcon?: string) {
     const base = AGENT_NARRATIVE[agentId];
@@ -370,13 +413,25 @@ function handleAtmosEvent(event: any) {
 
         // ── Unified pipeline metadata events ─────────────────────
         case 'run_started': {
+            // ── Phase: understanding ──────────────────────────────────────
+            _intentState.fileCount = 0;
+            _intentState.lastCpId = null;
+            const ss0 = useStreamStore.getState();
+            // Hard-reset phase state (previous run may have been in 'completed')
+            ss0.reset();
+            ss0.setPhase('understanding');
+            // setPhase has a 400ms delay, so add checkpoint immediately after
+            setTimeout(() => {
+                _intentState.lastCpId = useStreamStore.getState().addCheckpoint('Reading your request');
+            }, 450);
+
             const mode = typeof payload.mode === 'string' ? payload.mode : 'full';
             const tier = typeof payload.token_tier === 'string' ? payload.token_tier : 'free';
             const intent = (store.lastIntent || '').trim();
             EventBus.emit('AI_MESSAGE', {
                 content: `Run started (${mode} mode, ${tier} tier)`,
                 role: 'assistant',
-                agentName: 'AI Team',
+                agentName: 'Orchestrator',
                 agentIcon: 'brain',
                 messageType: 'event_card',
                 eventType: 'run_started',
@@ -387,8 +442,8 @@ function handleAtmosEvent(event: any) {
                 to: 'All',
                 icon: 'crown',
                 message: intent
-                    ? `I received your requirement: "${intent}".\n\nI am assigning the team now and will post live thinking + execution updates as each agent works.`
-                    : 'I received your requirement. I am assigning the team now and will post live thinking + execution updates as each agent works.',
+                    ? `Got it — "${intent}".\n\nI'm pulling the team together now. You'll see each person's work in real time as they go. Let's build this.`
+                    : "Got the brief. Pulling the team together now — you'll see each person's work as they go. Let's build this.",
             }, 'atoms');
 
             const chatModel = typeof payload.chat_model === 'string' ? payload.chat_model : '';
@@ -401,7 +456,7 @@ function handleAtmosEvent(event: any) {
                 EventBus.emit('AI_MESSAGE', {
                     content: modelContent,
                     role: 'assistant',
-                    agentName: 'AI Team',
+                    agentName: 'Orchestrator',
                     agentIcon: 'brain',
                     messageType: 'event_card',
                     eventType: 'model_configured',
@@ -433,7 +488,7 @@ function handleAtmosEvent(event: any) {
             EventBus.emit('AI_MESSAGE', {
                 content,
                 role: 'assistant',
-                agentName: 'AI Team',
+                agentName: 'Orchestrator',
                 agentIcon: 'brain',
                 messageType: 'event_card',
                 eventType: 'budget_configured',
@@ -443,9 +498,21 @@ function handleAtmosEvent(event: any) {
         }
 
         case 'execution_plan': {
+            // ── Phase: planning ───────────────────────────────────────────
+            const ss1 = useStreamStore.getState();
+            ss1.completeLastPendingCheckpoint();
+            ss1.setPhase('planning');
+
             const order = Array.isArray(payload.execution_order)
                 ? payload.execution_order.map((s: any) => String(s).replace(/_/g, ' '))
                 : [];
+
+            if (order.length > 0) {
+                _intentState.lastCpId = ss1.addCheckpoint(`Sequence: ${order.slice(0, 4).join(' → ')}${order.length > 4 ? '…' : ''}`);
+            } else {
+                _intentState.lastCpId = ss1.addCheckpoint('Execution plan ready');
+            }
+
             const content = order.length > 0
                 ? `Execution plan: ${order.join(' -> ')}`
                 : 'Execution plan ready';
@@ -453,7 +520,7 @@ function handleAtmosEvent(event: any) {
             EventBus.emit('AI_MESSAGE', {
                 content,
                 role: 'assistant',
-                agentName: 'AI Team',
+                agentName: 'Orchestrator',
                 agentIcon: 'brain',
                 messageType: 'event_card',
                 eventType: 'execution_plan',
@@ -463,7 +530,9 @@ function handleAtmosEvent(event: any) {
                 from: 'Team Leader',
                 to: 'All',
                 icon: 'crown',
-                message: content,
+                message: order.length > 0
+                    ? `Here's the plan: ${order.join(' → ')}. Each person will take their turn — I'll keep things moving.`
+                    : "Execution plan is locked in. Let's get started.",
             }, 'atoms');
             break;
         }
@@ -483,6 +552,25 @@ function handleAtmosEvent(event: any) {
                     try { store.transition(agentPhase); } catch { /* skip invalid transition */ }
                 }
             }
+
+            // ── Phase engine: advance stream phase ────────────────
+            const streamPhaseForAgent = agentToStreamPhase(String(payload.agent || ''));
+            const ssAgent = useStreamStore.getState();
+            if (streamPhaseForAgent) {
+                ssAgent.completeLastPendingCheckpoint();
+                ssAgent.setPhase(streamPhaseForAgent);
+            }
+            _intentState.lastCpId = ssAgent.addCheckpoint(`${narrative.name} is working`);
+
+            // Track active agent so message tokens get routed to thinking display
+            _intentState.activeAgentId = String(payload.agent || '');
+
+            // ── Drive agent presence bar ─────────────────────────
+            const rosterIdStart = toRosterId(String(payload.agent || ''));
+            if (rosterIdStart) {
+                ssAgent.setAgentStatus(rosterIdStart, 'working');
+            }
+
             EventBus.emit('AI_AGENT_START', {
                 agent: payload.agent,
                 name: narrative.name,
@@ -490,22 +578,13 @@ function handleAtmosEvent(event: any) {
                 description: payload.description,
             }, 'atoms');
 
-            EventBus.emit('AI_DISCUSSION', {
-                from: narrative.name,
-                to: 'Team Leader',
+            // Emit the thinking block event — adds a Claude-style thinking card to chat
+            EventBus.emit('AI_AGENT_ACTIVE', {
+                name: narrative.name,
                 icon: narrative.icon,
-                message: narrative.thinking,
+                thinking: narrative.thinking,
             }, 'atoms');
 
-            // Show agent status in chat as event card
-            EventBus.emit('AI_MESSAGE', {
-                content: payload.description || `${narrative.name} is working...`,
-                role: 'assistant',
-                agentName: narrative.name,
-                agentIcon: narrative.icon,
-                messageType: 'agent_status',
-                eventType: `${payload.agent}_started`,
-            }, 'atoms');
             // Route to terminal log
             EventBus.emit('TERMINAL_OUTPUT', {
                 text: `${narrative.name}_started`,
@@ -520,18 +599,42 @@ function handleAtmosEvent(event: any) {
                 typeof payload.name === 'string' ? payload.name : undefined,
                 typeof payload.icon === 'string' ? payload.icon : undefined,
             );
+
+            // Clear active agent tracking
+            _intentState.activeAgentId = null;
+
+            // ── Phase engine: mark checkpoint done + bump progress ─
+            const ssEnd = useStreamStore.getState();
+            if (_intentState.lastCpId) {
+                ssEnd.completeCheckpoint(_intentState.lastCpId);
+                _intentState.lastCpId = null;
+            } else {
+                ssEnd.completeLastPendingCheckpoint();
+            }
+            ssEnd.bumpProgress(0.06, 0.92);
+
+            // ── Mark agent done in presence bar ──────────────────
+            const rosterIdEnd = toRosterId(String(payload.agent || ''));
+            if (rosterIdEnd) {
+                ssEnd.setAgentStatus(rosterIdEnd, 'done');
+            }
+
+            // ── Add narrative checkmark (dev/debug) ───────────────
+            ssEnd.addNarrativeItem(narrative.done);
+
             EventBus.emit('AI_AGENT_END', {
                 agent: payload.agent,
                 result: payload.result,
             }, 'atoms');
-            EventBus.emit('AI_DISCUSSION', {
-                from: narrative.name,
-                to: 'Team Leader',
+
+            // Close the thinking block
+            EventBus.emit('AI_AGENT_DONE', {
+                name: narrative.name,
                 icon: narrative.icon,
-                message: typeof payload.result === 'string' && payload.result.trim()
-                    ? `${narrative.done}\n${payload.result}`
-                    : narrative.done,
+                result: payload.result,
             }, 'atoms');
+
+            // Show the agent's result as a regular message if there's content
             if (payload.result) {
                 EventBus.emit('AI_MESSAGE', {
                     content: payload.result,
@@ -561,16 +664,16 @@ function handleAtmosEvent(event: any) {
 
         // ── File events (atoms_engine uses file_start/delta/end) ─
         case 'file_start':
+            // Signal the editor panel to open the file and enable live-writing mode.
+            // We intentionally do NOT add a per-file chat message here — with many files
+            // that would flood the chat with dozens of "Writing X..." status bubbles.
             EventBus.emit('AI_FILE_WRITING', {
                 path: payload.path,
             }, 'atoms');
+            // Emit a single status token so the streaming placeholder updates
             if (payload.path) {
-                EventBus.emit('AI_MESSAGE', {
-                    content: `Writing ${payload.path}...`,
-                    role: 'assistant',
-                    agentName: 'Engineer',
-                    agentIcon: 'code',
-                    messageType: 'agent_status',
+                EventBus.emit('AI_MESSAGE_TOKEN', {
+                    token: `Writing ${payload.path}…\n`,
                 }, 'atoms');
             }
             break;
@@ -583,20 +686,15 @@ function handleAtmosEvent(event: any) {
             break;
 
         case 'file_end':
-            // atoms_engine file_end doesn't include content, flush live writer
+            // atoms_engine file_end doesn't include content — flush live writer
             EventBus.emit('FILE_CREATED', {
                 path: payload.path,
                 content: '', // content was streamed via deltas
             }, 'atoms');
-            if (payload.path) {
-                EventBus.emit('AI_MESSAGE', {
-                    content: `Finished ${payload.path}`,
-                    role: 'assistant',
-                    agentName: 'Engineer',
-                    agentIcon: 'code',
-                    messageType: 'agent_result',
-                }, 'atoms');
-            }
+            // Bump phase progress as files complete
+            _intentState.fileCount++;
+            useStreamStore.getState().bumpProgress(0.02, 0.92);
+            // No per-file chat message — the editor already shows the live content
             break;
 
         // ── File events (atmos.py style) ─────────────────────────
@@ -605,6 +703,8 @@ function handleAtmosEvent(event: any) {
                 path: payload.path,
                 content: payload.content,
             }, 'atmos');
+            _intentState.fileCount++;
+            useStreamStore.getState().bumpProgress(0.02, 0.92);
             break;
 
         case 'file_token':
@@ -669,15 +769,50 @@ function handleAtmosEvent(event: any) {
             break;
 
         case 'chat_token':
-            EventBus.emit('AI_MESSAGE_TOKEN', {
-                token: payload.token,
-            }, 'atoms');
+            if (_intentState.activeAgentId) {
+                // Agent is working — stream into the thinking block
+                EventBus.emit('AI_THINKING_TOKEN', { token: payload.token }, 'atoms');
+            } else {
+                EventBus.emit('AI_MESSAGE_TOKEN', { token: payload.token }, 'atoms');
+            }
             break;
 
         case 'message_token':
-            EventBus.emit('AI_MESSAGE_TOKEN', {
-                token: payload.token,
-            }, 'atoms');
+            if (_intentState.activeAgentId) {
+                // Agent is working — stream into the thinking block
+                EventBus.emit('AI_THINKING_TOKEN', { token: payload.token }, 'atoms');
+            } else {
+                EventBus.emit('AI_MESSAGE_TOKEN', { token: payload.token }, 'atoms');
+            }
+            break;
+
+        // ── Thinking tokens (ATMOS real-time reasoning) ─────────
+        case 'thinking_token':
+            // Always route to thinking block — these come during interpret phase
+            EventBus.emit('AI_THINKING_TOKEN', { token: payload.token }, 'atoms');
+            break;
+
+        // ── Stream lifecycle events ──────────────────────────────
+        case 'stream_start':
+            EventBus.emit('AI_AGENT_ACTIVE', {
+                name: payload.channel === 'thinking' ? 'Interpreter' : 'Engineer',
+                icon: payload.channel === 'thinking' ? 'brain' : 'code',
+                thinking: payload.channel === 'thinking'
+                    ? 'Analyzing your request and planning the approach…'
+                    : 'Generating code…',
+            }, 'atmos');
+            useStreamStore.getState().setAgentActive(true);
+            break;
+
+        case 'stream_end':
+            // Channel stream completed — frontend can flush buffers
+            if (payload.channel === 'thinking') {
+                EventBus.emit('AI_AGENT_DONE', {
+                    name: 'Interpreter',
+                    icon: 'brain',
+                    result: 'Analysis complete',
+                }, 'atmos');
+            }
             break;
 
         // ── Blackboard updates → Event cards ─────────────────────
@@ -722,10 +857,26 @@ function handleAtmosEvent(event: any) {
                 content = `Project type: ${typeof val === 'string' ? val : JSON.stringify(val)}`;
             }
 
+            // ── Add as phase checkpoint + narrative checkmark ────
+            const narrativeText = (() => {
+                if (field === 'prd') return 'Execution plan finalized';
+                if (field === 'detected_stack') return content;
+                if (field === 'architecture') return content;
+                if (field === 'qa_result') return content;
+                if (field === 'project_type') return content;
+                return null;
+            })();
+            if (narrativeText) {
+                const ssBb = useStreamStore.getState();
+                ssBb.addNarrativeItem(narrativeText);
+                // Also surface as a checkpoint in the PhaseBlock
+                ssBb.addCheckpoint(narrativeText);
+            }
+
             EventBus.emit('AI_MESSAGE', {
                 content,
                 role: 'assistant',
-                agentName: 'AI Team',
+                agentName: 'Orchestrator',
                 agentIcon: 'brain',
                 messageType: 'event_card',
                 eventType: label,
@@ -748,10 +899,24 @@ function handleAtmosEvent(event: any) {
 
         // ── Done ─────────────────────────────────────────────────
         case 'done':
+            _intentState.activeAgentId = null;
+            _intentState.lastCpId = null;
+
+            // ── Phase engine: completed ───────────────────────────
+            {
+                const ssDone = useStreamStore.getState();
+                ssDone.completeLastPendingCheckpoint();
+                // Immediate progress to 1 then phase to completed (setPhase has 400ms delay)
+                ssDone.setProgress(1);
+                ssDone.setPhase('completed');
+                ssDone.addCheckpoint('Project successfully generated');
+            }
+
             EventBus.emit('ATMOS_DONE', {}, 'atoms');
             if (store.phase !== 'live') {
                 store.transition('idle');
             }
+            // Do NOT auto-reset — CompletionCard stays visible. User can reset by starting new run.
             break;
     }
 }

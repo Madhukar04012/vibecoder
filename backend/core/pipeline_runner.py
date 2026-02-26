@@ -570,8 +570,8 @@ class PipelineRunner:
         if self.context.on_event:
             try:
                 self.context.on_event(event, payload)
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.log("on_event_failed", {"error": str(e)})
 
     def _build_result(
         self,

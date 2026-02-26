@@ -38,6 +38,7 @@ export default {
         'fade-in-up': 'fade-in-up 0.3s ease-out forwards',
         'slide-up': 'slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'scale-in': 'scale-in 0.2s ease-out forwards',
+        shimmer: 'shimmer 5s linear infinite',
       },
       transitionDuration: {
         '400': '400ms',

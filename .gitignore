@@ -14,6 +14,7 @@ venv/
 .venv/
 env/
 .env
+.env.*
 
 # Database
 *.db
@@ -62,3 +63,9 @@ frontend/dist/
 
 # Debug / Cursor
 .cursor/debug.log
+
+# Runtime / temp
+run_logs/*.jsonl
+run_logs/*.json
+tmpclaude-*
+nul

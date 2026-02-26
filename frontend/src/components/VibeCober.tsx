@@ -869,7 +869,7 @@ const VibeCober: React.FC = () => {
                     { name: 'Coder', status: 'pending', icon: '⚙️' },
                     { name: 'Tester', status: 'pending', icon: '🧪' },
                     { name: 'Deployer', status: 'pending', icon: '🚀' },
-                  ].map((agent, i) => (
+                  ].map((agent) => (
                     <div
                       key={agent.name}
                       className={cn(

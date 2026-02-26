@@ -5,8 +5,8 @@
 
 import { useMemo } from "react";
 import {
-  FolderTree, File, FolderOpen, Folder, ChevronRight, ChevronDown,
-  Sparkles, Search, FileCode, FileJson, FileText, Braces, Hash,
+  FolderTree, File, FolderOpen, Folder, ChevronRight,
+  Sparkles, FileCode, FileJson, FileText, Braces, Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIDEStore } from "@/stores/ide-store";
@@ -26,7 +26,7 @@ interface TreeNode {
 
 // ─── Build tree from flat paths ─────────────────────────────────────────────
 
-function buildTree(paths: string[], fileStatuses: Record<string, { isNew: boolean; isAIGenerated: boolean }>): TreeNode[] {
+function buildTree(paths: string[], fileStatuses: Record<string, { isNew?: boolean; isAIGenerated?: boolean }>): TreeNode[] {
   const root: Record<string, unknown> = {};
 
   for (const path of paths) {

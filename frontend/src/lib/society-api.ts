@@ -124,14 +124,13 @@ export interface WsMessage {
 
 export type WsMessageHandler = (msg: WsMessage) => void;
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_MS = 1_000;
+
 /**
  * Subscribe to real-time workflow events for a run_id.
+ * Auto-reconnects with exponential backoff on unexpected disconnection.
  * Returns an unsubscribe function — call it to close the WebSocket.
- *
- * Usage:
- *   const unsub = subscribeToRun(runId, (msg) => { ... });
- *   // later:
- *   unsub();
  */
 export function subscribeToRun(
   run_id: string,
@@ -140,46 +139,74 @@ export function subscribeToRun(
 ): () => void {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const host = window.location.hostname;
-  // Use port 8000 in dev, same port in production
   const port = import.meta.env.DEV ? ":8000" : "";
   const url = `${protocol}//${host}${port}/api/society/ws/updates/${run_id}`;
 
-  let ws: WebSocket | null = new WebSocket(url);
+  let ws: WebSocket | null = null;
   let pingInterval: ReturnType<typeof setInterval> | null = null;
   let closed = false;
+  let reconnectAttempts = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-  ws.onopen = () => {
-    // Send periodic client pings every 25 seconds to keep connection alive
-    pingInterval = setInterval(() => {
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "ping" }));
+  function cleanup() {
+    if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  }
+
+  function connect() {
+    if (closed) return;
+
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      reconnectAttempts = 0;
+      pingInterval = setInterval(() => {
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 25_000);
+    };
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data) as WsMessage;
+        if (msg.type !== "ping") {
+          onMessage(msg);
+        }
+      } catch {
+        console.warn("[society-ws] Malformed message:", evt.data);
       }
-    }, 25_000);
-  };
+    };
 
-  ws.onmessage = (evt) => {
-    try {
-      const msg = JSON.parse(evt.data) as WsMessage;
-      if (msg.type !== "ping") {
-        onMessage(msg);
+    ws.onclose = (ev) => {
+      if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+
+      if (closed) {
+        onClose?.();
+        return;
       }
-    } catch {
-      // ignore malformed messages
-    }
-  };
 
-  ws.onclose = () => {
-    if (pingInterval) clearInterval(pingInterval);
-    if (!closed) onClose?.();
-  };
+      // Reconnect on unexpected close (not clean 1000)
+      if (ev.code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        const delay = Math.min(RECONNECT_BASE_MS * 2 ** reconnectAttempts, 30_000);
+        reconnectAttempts++;
+        console.log(`[society-ws] Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+        reconnectTimer = setTimeout(connect, delay);
+      } else {
+        onClose?.();
+      }
+    };
 
-  ws.onerror = () => {
-    ws?.close();
-  };
+    ws.onerror = () => {
+      ws?.close();
+    };
+  }
+
+  connect();
 
   return () => {
     closed = true;
-    if (pingInterval) clearInterval(pingInterval);
+    cleanup();
     ws?.close();
     ws = null;
   };

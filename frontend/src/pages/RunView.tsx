@@ -1,7 +1,7 @@
 /**
  * Run view: live agent activity + live document typing + document viewer
  */
-import React, { useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AgentDashboard } from "@/components/society/AgentDashboard";
 import { DocumentViewer } from "@/components/society/DocumentViewer";

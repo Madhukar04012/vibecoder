@@ -16,7 +16,7 @@ def run_migrations():
 
     # Configure Alembic
     alembic_cfg = Config(str(backend_dir / "alembic.ini"))
-    alembic_cfg.set_main_option("script_location", str(backend_dir / "alembic"))
+    alembic_cfg.set_main_option("script_location", str(backend_dir / "migrations"))
 
     try:
         # Run migrations
@@ -25,7 +25,20 @@ def run_migrations():
         print("✓ Database migrations completed successfully")
         return True
     except Exception as e:
-        print(f"✗ Migration failed: {e}")
+        err_msg = str(e)
+        print(f"✗ Migration failed: {err_msg}")
+
+        # If the DB references a deleted revision, stamp to current head and retry
+        if "Can't locate revision" in err_msg:
+            try:
+                print("Stamping database to current migration head...")
+                command.stamp(alembic_cfg, "head")
+                command.upgrade(alembic_cfg, "head")
+                print("✓ Database re-stamped and migrations applied")
+                return True
+            except Exception as stamp_err:
+                print(f"✗ Re-stamp also failed: {stamp_err}")
+
         # Fall back to create_all for development
         print("Falling back to create_all...")
         from backend.database import Base, engine

@@ -12,22 +12,27 @@ Endpoints:
 - GET /api/marketplace/{atom_id} - Get atom details
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.marketplace.registry import get_atom_registry
 from backend.engine.atom_loader import get_atom_loader
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/marketplace", tags=["marketplace"])
+
+# Atoms must be installed from within the project directory tree
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 # ─── Request Models ──────────────────────────────────────────────────────────
 
 class InstallRequest(BaseModel):
-    source_path: str
+    source_path: str = Field(..., max_length=500)
     approved_by: str = "user"
 
 
@@ -49,20 +54,27 @@ async def list_installed():
 
 @router.post("/install")
 async def install_atom(request: InstallRequest):
-    """
-    Install an atom from source path.
-    
-    Source path must contain atom.yaml manifest.
-    """
+    """Install an atom from source path (must be within project tree)."""
     registry = get_atom_registry()
-    
-    source = Path(request.source_path)
+
+    source = Path(request.source_path).resolve()
+
+    # Security: block path traversal — source must be inside project root
+    try:
+        source.relative_to(_PROJECT_ROOT)
+    except ValueError:
+        logger.warning("Marketplace install blocked — path outside project: %s", request.source_path[:200])
+        raise HTTPException(
+            status_code=400,
+            detail="Source path must be within the project directory.",
+        )
+
     if not source.exists():
-        raise HTTPException(status_code=404, detail=f"Source path not found: {request.source_path}")
-    
+        raise HTTPException(status_code=404, detail="Source path not found.")
+
     if not (source / "atom.yaml").exists():
-        raise HTTPException(status_code=400, detail="No atom.yaml found in source path")
-    
+        raise HTTPException(status_code=400, detail="No atom.yaml found in source path.")
+
     try:
         installed = registry.install(
             str(source),
@@ -74,8 +86,9 @@ async def install_atom(request: InstallRequest):
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Install failed: {e}")
+    except OSError as e:
+        logger.error("Atom install failed: %s", e)
+        raise HTTPException(status_code=500, detail="Install failed due to filesystem error.")
 
 
 @router.delete("/{atom_id}")

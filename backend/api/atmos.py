@@ -17,6 +17,7 @@ The AI controls EVERYTHING:
 User NEVER runs commands, creates files, or fixes errors.
 """
 
+import logging
 import os
 import json
 import asyncio
@@ -24,10 +25,12 @@ import traceback
 from typing import AsyncGenerator, Dict, Any, Optional
 
 from fastapi import APIRouter, Request
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.engine.llm_gateway import llm_call_simple, extract_json
+from backend.engine.llm_gateway import llm_call_simple, llm_call_stream, extract_json
 from backend.engine.token_ledger import ledger
 from backend.engine.sandbox import get_sandbox_manager
 from backend.engine.events import get_event_emitter, EngineEventType
@@ -84,17 +87,85 @@ def done_event() -> str:
 
 def chat_token_event(token: str) -> str:
     """Stream individual chat tokens for real-time typing effect."""
-    return sse_event({"type": "chat_token", "token": token})
+    return sse_event({"type": "chat_token", "token": token, "channel": "chat"})
+
+
+def thinking_token_event(token: str) -> str:
+    """Stream thinking/reasoning tokens for live typing effect."""
+    return sse_event({"type": "thinking_token", "token": token, "channel": "thinking"})
 
 
 def file_writing_event(path: str) -> str:
     """Signal that AI is starting to write a specific file."""
-    return sse_event({"type": "file_writing", "path": path})
+    return sse_event({"type": "file_writing", "path": path, "channel": "system"})
 
 
 def file_token_event(path: str, token: str) -> str:
     """Stream a chunk of file content for live typing effect."""
-    return sse_event({"type": "file_token", "path": path, "token": token})
+    return sse_event({"type": "file_token", "path": path, "token": token, "channel": "code"})
+
+
+def stream_start_event(channel: str) -> str:
+    """Signal that a stream is starting on a channel (frontend shows typing indicator)."""
+    return sse_event({"type": "stream_start", "channel": channel})
+
+
+def stream_end_event(channel: str) -> str:
+    """Signal that a stream has ended on a channel (frontend flushes + hides indicator)."""
+    return sse_event({"type": "stream_end", "channel": channel})
+
+
+# ─── Async Streaming Helper ──────────────────────────────────────────────────
+
+def _stream_llm_sync(
+    system: str, user: str, agent_name: str = "atmos_pipeline",
+    max_tokens: int = 2048, temp: float = 0.3, use_coder: bool = False,
+):
+    """Synchronous streaming LLM call — yields token strings. Blocks the thread."""
+    yield from llm_call_stream(
+        agent_name=agent_name,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        max_tokens=max_tokens,
+        temperature=temp,
+        use_coder=use_coder,
+    )
+
+
+async def _stream_llm_async(
+    system: str, user: str, agent_name: str = "atmos_pipeline",
+    max_tokens: int = 2048, temp: float = 0.3, use_coder: bool = False,
+):
+    """
+    Async generator: run the blocking LLM stream in a thread, yield tokens
+    without blocking the event loop. Uses asyncio.Queue for thread→async bridging.
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    sentinel = object()
+
+    def _produce():
+        try:
+            for token in _stream_llm_sync(system, user, agent_name, max_tokens, temp, use_coder):
+                if token:
+                    loop.call_soon_threadsafe(queue.put_nowait, token)
+        except Exception as exc:
+            loop.call_soon_threadsafe(queue.put_nowait, exc)
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, sentinel)
+
+    loop.run_in_executor(None, _produce)
+
+    while True:
+        item = await queue.get()
+        if item is sentinel:
+            break
+        if isinstance(item, Exception):
+            logger.warning("[ATMOS] Stream error: %s", item)
+            break
+        yield item
 
 
 # ─── Intent Interpreter ─────────────────────────────────────────────────────
@@ -128,9 +199,59 @@ Rules:
 """
 
 
+async def interpret_intent_streaming(intent: str):
+    """
+    Async generator: stream thinking tokens while interpreting intent.
+    Yields (token_str, None) for thinking tokens, and (None, plan_dict) at the end.
+    """
+    logger.debug("[ATMOS] Interpreting intent (streaming): %s...", intent[:100])
+
+    full_content = []
+    try:
+        async for token in _stream_llm_async(
+            system=INTERPRETER_SYSTEM,
+            user=intent,
+            agent_name="atmos_interpreter",
+            max_tokens=2048,
+            temp=0.3,
+        ):
+            full_content.append(token)
+            yield (token, None)  # thinking token
+    except Exception as e:
+        logger.exception("[ATMOS] Streaming interpret failed: %s", e)
+        yield (None, None)
+        return
+
+    response = "".join(full_content)
+    if not response:
+        logger.warning("[ATMOS] interpret_intent got empty response from LLM")
+        yield (None, None)
+        return
+
+    logger.debug("[ATMOS] interpret_intent response length: %s", len(response))
+    result = extract_json(response)
+
+    if not result:
+        logger.warning("[ATMOS] Failed to extract JSON from response: %s", response[:200])
+        yield (None, None)
+        return
+
+    if isinstance(result, list):
+        logger.debug("[ATMOS] Got list from LLM, wrapping as files array (%s items)", len(result))
+        result = {"files": result, "project_name": "my-app", "stack": "auto"}
+
+    if not isinstance(result, dict):
+        logger.warning("[ATMOS] Unexpected result type: %s", type(result))
+        yield (None, None)
+        return
+
+    logger.debug("[ATMOS] Plan has %s files", len(result.get("files", [])))
+    yield (None, result)  # final plan
+
+
 async def interpret_intent(intent: str) -> Optional[Dict[str, Any]]:
-    """Use LLM to interpret user intent into a project plan."""
-    print(f"[ATMOS] Interpreting intent: {intent[:100]}...")
+    """Non-streaming fallback: Use LLM to interpret user intent into a project plan."""
+    logger.debug("[ATMOS] Interpreting intent: %s...", intent[:100])
 
     try:
         response = await asyncio.to_thread(
@@ -142,31 +263,29 @@ async def interpret_intent(intent: str) -> Optional[Dict[str, Any]]:
             temperature=0.3,
         )
     except Exception as e:
-        print(f"[ATMOS] LLM call failed in interpret_intent: {e}")
+        logger.exception("[ATMOS] LLM call failed in interpret_intent: %s", e)
         return None
 
     if not response:
-        print("[ATMOS] interpret_intent got empty response from LLM")
+        logger.warning("[ATMOS] interpret_intent got empty response from LLM")
         return None
 
-    print(f"[ATMOS] interpret_intent response length: {len(response)}")
+    logger.debug("[ATMOS] interpret_intent response length: %s", len(response))
     result = extract_json(response)
 
     if not result:
-        print(f"[ATMOS] Failed to extract JSON from response: {response[:200]}")
+        logger.warning("[ATMOS] Failed to extract JSON from response: %s", response[:200])
         return None
 
-    # extract_json might return a list if the LLM outputs a JSON array
     if isinstance(result, list):
-        # Treat the list as the files array
-        print(f"[ATMOS] Got list from LLM, wrapping as files array ({len(result)} items)")
+        logger.debug("[ATMOS] Got list from LLM, wrapping as files array (%s items)", len(result))
         result = {"files": result, "project_name": "my-app", "stack": "auto"}
 
     if not isinstance(result, dict):
-        print(f"[ATMOS] Unexpected result type: {type(result)}")
+        logger.warning("[ATMOS] Unexpected result type: %s", type(result))
         return None
 
-    print(f"[ATMOS] Plan has {len(result.get('files', []))} files")
+    logger.debug("[ATMOS] Plan has %s files", len(result.get("files", [])))
     return result
 
 
@@ -201,15 +320,49 @@ def strip_code_fences(text: str) -> str:
     return stripped
 
 
+async def stream_generate_file(
+    file_path: str,
+    description: str,
+    plan: Dict[str, Any],
+):
+    """
+    Async generator: stream file content tokens as they arrive from the LLM.
+    Yields token strings. Caller collects them for the full file content.
+    """
+    all_files = ", ".join(f["path"] for f in plan.get("files", []))
+    logger.debug("[ATMOS] Streaming file generation: %s", file_path)
+
+    system = FILE_GEN_SYSTEM.format(
+        stack=plan.get("stack", ""),
+        project_name=plan.get("project_name", "app"),
+        all_files=all_files,
+    )
+    user = f"Generate the file: {file_path}\nDescription: {description}"
+
+    token_count = 0
+    async for token in _stream_llm_async(
+        system=system,
+        user=user,
+        agent_name="atmos_engineer",
+        max_tokens=4096,
+        temp=0.2,
+        use_coder=True,
+    ):
+        token_count += 1
+        yield token
+
+    logger.debug("[ATMOS] Streamed %s: %s tokens", file_path, token_count)
+
+
 async def generate_file(
     file_path: str,
     description: str,
     plan: Dict[str, Any],
 ) -> str:
-    """Generate a single file's content."""
+    """Non-streaming fallback: generate a single file's content."""
     all_files = ", ".join(f["path"] for f in plan.get("files", []))
 
-    print(f"[ATMOS] Generating file: {file_path}")
+    logger.debug("[ATMOS] Generating file: %s", file_path)
 
     try:
         response = await asyncio.to_thread(
@@ -225,11 +378,11 @@ async def generate_file(
             temperature=0.2,
         )
     except Exception as e:
-        print(f"[ATMOS] LLM call failed for {file_path}: {e}")
+        logger.exception("[ATMOS] LLM call failed for %s: %s", file_path, e)
         return f"// Error generating {file_path}: {e}"
 
     result = strip_code_fences(response) if response else f"// Error generating {file_path}"
-    print(f"[ATMOS] Generated {file_path}: {len(result)} chars")
+    logger.debug("[ATMOS] Generated %s: %s chars", file_path, len(result))
     return result
 
 
@@ -298,15 +451,30 @@ async def fix_error(
 
 async def atmos_pipeline(intent: str) -> AsyncGenerator[str, None]:
     """
-    The full ATMOS autonomous pipeline.
+    The full ATMOS autonomous pipeline — with real-time token streaming.
     User types intent → AI does everything → preview URL returned.
+
+    Key difference from before: LLM tokens stream in real-time instead of
+    generating full responses and then chunking them.
     """
 
-    # ── Phase 1: Interpret ───────────────────────────────────────────────────
+    # ── Phase 1: Interpret (with live thinking tokens) ───────────────────────
     yield phase_event("interpreting")
     yield status_event("Understanding your intent…")
 
-    plan = await interpret_intent(intent)
+    # Stream thinking tokens so the frontend shows live reasoning
+    plan = None
+    yield stream_start_event("thinking")
+    async for token, result in interpret_intent_streaming(intent):
+        if token:
+            yield thinking_token_event(token)
+        if result is not None:
+            plan = result
+    yield stream_end_event("thinking")
+
+    if not plan or "files" not in plan:
+        # Fallback to non-streaming if streaming returned nothing
+        plan = await interpret_intent(intent)
 
     if not plan or "files" not in plan:
         yield chat_event("I couldn't understand that. Try being more specific.")
@@ -316,7 +484,7 @@ async def atmos_pipeline(intent: str) -> AsyncGenerator[str, None]:
     project_name = plan.get("project_name", "my-app")
     yield chat_event(f"Building {project_name}…")
 
-    # ── Phase 2: Generate Files ──────────────────────────────────────────────
+    # ── Phase 2: Generate Files (real-time LLM token streaming) ──────────────
     yield phase_event("generating")
 
     files: Dict[str, str] = {}
@@ -328,16 +496,26 @@ async def atmos_pipeline(intent: str) -> AsyncGenerator[str, None]:
         yield status_event(f"Writing {path} ({i + 1}/{len(plan['files'])})")
         yield file_writing_event(path)
 
-        content = await generate_file(path, desc, plan)
-        files[path] = content
+        # Stream tokens directly from the LLM — real-time, not simulated
+        content_parts = []
+        yield stream_start_event("code")
+        try:
+            async for token in stream_generate_file(path, desc, plan):
+                content_parts.append(token)
+                yield file_token_event(path, token)
+        except Exception as e:
+            logger.warning("[ATMOS] Stream failed for %s, falling back: %s", path, e)
+            # Fallback to non-streaming generation
+            fallback_content = await generate_file(path, desc, plan)
+            content_parts = [fallback_content]
+            # Emit as larger chunks for the fallback path
+            for ci in range(0, len(fallback_content), 64):
+                yield file_token_event(path, fallback_content[ci:ci + 64])
+                await asyncio.sleep(0.005)
+        yield stream_end_event("code")
 
-        # Stream file content line-by-line for live typing effect
-        lines = content.split('\n')
-        for line_idx, line in enumerate(lines):
-            token = line + ('\n' if line_idx < len(lines) - 1 else '')
-            yield file_token_event(path, token)
-            # Small delay between lines for visual effect
-            await asyncio.sleep(0.015)
+        content = strip_code_fences("".join(content_parts))
+        files[path] = content
 
         # Send final complete file event
         yield file_event(path, content)
@@ -364,7 +542,7 @@ async def atmos_pipeline(intent: str) -> AsyncGenerator[str, None]:
                 # Try to fix
                 fixed = await _auto_fix_loop(
                     sandbox, files, plan, result.stderr, "install",
-                    lambda msg: None,  # Can't yield from nested — handled below
+                    lambda msg: None,
                 )
                 if not fixed:
                     yield error_event(f"Install failed: {result.stderr[:500]}")
@@ -381,7 +559,6 @@ async def atmos_pipeline(intent: str) -> AsyncGenerator[str, None]:
         if build_cmd:
             yield status_event("Building project…")
             result = sandbox.execute(build_cmd, timeout=60)
-            # Build failures are non-fatal for dev mode
 
         # Start dev server
         dev_cmd = plan.get("dev_command", "")
@@ -391,17 +568,12 @@ async def atmos_pipeline(intent: str) -> AsyncGenerator[str, None]:
             yield phase_event("running")
             yield status_event("Starting dev server…")
 
-            # Start in background (non-blocking)
             result = sandbox.execute(dev_cmd, timeout=5)
-
-            # Give server time to start
             await asyncio.sleep(2)
 
             preview_url = f"http://localhost:{dev_port}"
             yield preview_event(preview_url)
-            # preview_event triggers transition to 'live' on the frontend
         else:
-            # Static project — no dev server needed, go straight to live
             yield phase_event("live")
             yield status_event("Project ready.")
 

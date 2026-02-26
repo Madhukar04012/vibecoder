@@ -2,7 +2,7 @@
  * Project Creation Wizard - plan IDE Frontend Phase 1.1
  * Steps: template → description → tech stack → review → create
  */
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -1,6 +1,5 @@
 """Learning module for self-improvement and failure analysis."""
 
-from .reflector import ReflectionAgent, Reflection
 from .failure_analyzer import (
     FailureAnalyzer,
     ExecutionFailure,
@@ -18,9 +17,6 @@ from .improvement_engine import (
 )
 
 __all__ = [
-    # Reflector (basic)
-    "ReflectionAgent",
-    "Reflection",
     # Failure Analysis (enhanced)
     "FailureAnalyzer",
     "ExecutionFailure",

@@ -73,11 +73,15 @@ IDE_TOOLS = [
     },
     {
         "name": "run_command",
-        "description": "Execute a shell command in the workspace (restricted to safe commands)",
+        "description": "Execute a whitelisted shell command in the workspace (npm, node, python, git, ls only)",
         "input_schema": {
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "Shell command to execute"}
+                "command": {
+                    "type": "string",
+                    "description": "Shell command to execute. Only npm, node, python, git, ls, cat, echo are allowed.",
+                    "maxLength": 2000,
+                }
             },
             "required": ["command"]
         }
@@ -111,34 +115,30 @@ async def agent_chat(request: ChatRequest, http_request: Request):
         )
 
     try:
-        from anthropic import Anthropic
-
-        client = Anthropic(
-            api_key=api_key,
-            timeout=30.0  # 30 second timeout
+        from anthropic import AsyncAnthropic
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Anthropic SDK not installed. Run: pip install anthropic"
         )
 
-        # Build messages in Anthropic format
-        messages = []
-        for msg in request.messages:
-            messages.append({
-                "role": msg.role,
-                "content": msg.content
-            })
+    try:
+        client = AsyncAnthropic(
+            api_key=api_key,
+            timeout=30.0,
+        )
 
-        # Prepare tools if agent can use them
+        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         tools = IDE_TOOLS if request.can_use_tools else None
 
-        # Call Anthropic API with timeout protection
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+        response = await client.messages.create(
+            model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
             max_tokens=request.max_tokens,
             system=request.system_prompt,
             messages=messages,
             tools=tools,
         )
 
-        # Extract usage metrics
         usage = None
         if hasattr(response, 'usage'):
             usage = {
@@ -152,16 +152,11 @@ async def agent_chat(request: ChatRequest, http_request: Request):
             stop_reason=response.stop_reason if hasattr(response, 'stop_reason') else None
         )
 
-    except ImportError:
-        raise HTTPException(
-            status_code=503,
-            detail="Anthropic SDK not installed. Run: pip install anthropic"
-        )
     except Exception as e:
-        logger.error(f"Agent chat error: {e}", exc_info=True)
+        logger.exception("Agent chat error: %s", e)
         raise HTTPException(
             status_code=500,
-            detail=f"Error calling Anthropic API: {str(e)}"
+            detail="Error calling AI service. Please try again or contact support.",
         )
 
 

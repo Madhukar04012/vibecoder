@@ -9,17 +9,23 @@ Architecture:
 
 import asyncio
 import json
+import logging
 import os
 import re
 import subprocess
 import time
+import uuid
 from pathlib import Path
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from backend.core.orchestrator import execute_project
+from backend.core.streaming.agent_stream_bus import get_agent_stream_bus
 from backend.core.tech_detector import detect_stack, get_architect_prompt_for_stack, get_engineer_prompt_for_stack, get_fallback_architecture
 
 router = APIRouter(prefix="/api/atoms", tags=["atoms"])
@@ -338,7 +344,7 @@ async def _stream_llm_to_sse(system: str, user: str, file_path: str, max_tokens:
         if item is sentinel:
             break
         if isinstance(item, Exception):
-            print(f"[Atoms Engine] Stream error: {item}")
+            logger.exception("[Atoms] Stream error: %s", item)
             break
         content_parts.append(item)
         yield item  # caller wraps in sse("file_delta", ...)
@@ -1085,7 +1091,9 @@ async def _stream_unified_standard(prompt: str, files: dict) -> AsyncGenerator[s
     def _agent_display(agent_id: str) -> tuple[str, str]:
         return agent_meta.get(agent_id, (agent_id.replace("_", " ").title(), "brain"))
 
-    async def _emit_tokens(text: str, chunk_size: int = 14, delay_s: float = 0.01) -> AsyncGenerator[str, None]:
+    async def _emit_tokens(text: str, chunk_size: int = 3, delay_s: float = 0.005) -> AsyncGenerator[str, None]:
+        """Stream text as message_token events for Replit/Atmos-level typewriter effect.
+        Small chunks (3 chars) + short delay (5ms) = smooth 60fps dripping."""
         if not text:
             return
         for i in range(0, len(text), chunk_size):
@@ -1352,4 +1360,137 @@ async def get_engine_events(limit: int = 50, event_type: str = ""):
     ]
     
     return EventsResponse(events=events_data, total=len(events_data))
+
+
+# ─── Agent Chat Runtime (WebSocket + Orchestrator Events) ───────────────────
+
+_agent_chat_runs: Dict[str, Dict[str, Any]] = {}
+
+
+class AgentChatExecuteRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    project_id: Optional[str] = None
+    max_revision_loops: int = Field(default=2, ge=0, le=3)
+
+
+class AgentChatExecuteResponse(BaseModel):
+    run_id: str
+    project_id: str
+    status: str
+
+
+@router.websocket("/ws/agents/{project_id}")
+async def agents_ws_updates(websocket: WebSocket, project_id: str) -> None:
+    """
+    Subscribe to live per-agent updates for a project.
+
+    Message types:
+    - connected
+    - keepalive_ping / keepalive_pong
+    - run_started / run_finished / run_failed
+    - agent_started / agent_completed / agent_token
+    - task_started / task_retry / task_failed / task_completed
+    - dag_batch_started / dag_batch_finished
+    """
+    bus = get_agent_stream_bus()
+    await bus.connect(project_id, websocket)
+
+    try:
+        await websocket.send_json({"type": "connected", "project_id": project_id})
+        while True:
+            try:
+                msg = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                if msg.strip().lower() == "ping":
+                    await websocket.send_json({"type": "keepalive_pong"})
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "keepalive_ping"})
+    except WebSocketDisconnect:
+        logger.info("[Atoms] WS client disconnected: project_id=%s", project_id)
+    except Exception as e:
+        logger.exception("[Atoms] WS error: %s", e)
+    finally:
+        await bus.disconnect(project_id, websocket)
+
+
+@router.post("/chat/execute", response_model=AgentChatExecuteResponse)
+async def execute_agents_chat(body: AgentChatExecuteRequest) -> AgentChatExecuteResponse:
+    """
+    Start DAG + worker-pool execution and stream events over WebSocket.
+
+    Client flow:
+    1. Open WebSocket `/api/atoms/ws/agents/{project_id}`
+    2. POST this endpoint with same `project_id`
+    """
+    run_id = f"agent_run_{uuid.uuid4().hex[:10]}"
+    project_id = body.project_id or run_id
+
+    _agent_chat_runs[run_id] = {
+        "run_id": run_id,
+        "project_id": project_id,
+        "status": "queued",
+        "prompt_preview": body.prompt[:200],
+        "started_at": time.time(),
+        "finished_at": None,
+        "result": None,
+        "error": None,
+        "last_event": "queued",
+    }
+
+    asyncio.create_task(
+        _run_agent_chat_session(
+            run_id=run_id,
+            project_id=project_id,
+            prompt=body.prompt,
+            max_revision_loops=body.max_revision_loops,
+        )
+    )
+
+    return AgentChatExecuteResponse(run_id=run_id, project_id=project_id, status="queued")
+
+
+@router.get("/chat/status/{run_id}")
+async def get_agent_chat_status(run_id: str) -> Dict[str, Any]:
+    status = _agent_chat_runs.get(run_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return status
+
+
+async def _run_agent_chat_session(
+    run_id: str,
+    project_id: str,
+    prompt: str,
+    max_revision_loops: int,
+) -> None:
+    bus = get_agent_stream_bus()
+    state = _agent_chat_runs.get(run_id, {})
+    state["status"] = "running"
+
+    async def emit(event_name: str, payload: Dict[str, Any]) -> None:
+        state["last_event"] = event_name
+        await bus.broadcast(
+            project_id,
+            {
+                "type": event_name,
+                "run_id": run_id,
+                "project_id": project_id,
+                **payload,
+            },
+        )
+
+    try:
+        result = await execute_project(
+            user_prompt=prompt,
+            max_revision_loops=max_revision_loops,
+            on_event=emit,
+            project_id=project_id,
+        )
+        state["result"] = result
+        state["status"] = "completed" if result.get("success") else "failed"
+        state["finished_at"] = time.time()
+    except Exception as exc:
+        state["status"] = "failed"
+        state["error"] = str(exc)
+        state["finished_at"] = time.time()
+        await emit("run_failed", {"error": str(exc)})
 

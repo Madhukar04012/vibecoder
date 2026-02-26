@@ -30,6 +30,9 @@ export type AtmosEventType =
   | 'AI_DIFF_REJECTED'
   | 'AI_AGENT_START'
   | 'AI_AGENT_END'
+  | 'AI_AGENT_ACTIVE'
+  | 'AI_AGENT_DONE'
+  | 'AI_THINKING_TOKEN'
   | 'AI_FILE_WRITING'
   | 'AI_FILE_DELTA'
   | 'AI_FILE_COMPLETE'
@@ -59,7 +62,9 @@ export type AtmosEventType =
   | 'ATMOS_PHASE_CHANGE'
   | 'ATMOS_STATUS'
   | 'ATMOS_ERROR_FIXING'
-  | 'ATMOS_DONE';
+  | 'ATMOS_DONE'
+  // WebSocket connection lifecycle
+  | 'WS_STATUS';
 
 // ─── Event Payloads ─────────────────────────────────────────────────────────
 

@@ -22,7 +22,8 @@ sys.path.insert(0, root_dir)
 from backend.database import Base, DATABASE_URL
 from backend.models import (
     User, Project, ProjectAgent, ProjectPlan, Conversation, Task, ExecutionLog,
-    Agent, AgentMessage, ProjectRun, Artifact
+    Agent, AgentMessage, ProjectRun, Artifact,
+    NimProject, NimDagSnapshot, NimTask, NimTaskOutput, NimAgentLog,
 )
 
 # Alembic Config object

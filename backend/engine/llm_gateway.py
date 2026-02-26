@@ -1,8 +1,10 @@
 """
-LLM Gateway — Phase-1 (OpenAI SDK + auto-loads .env)
+LLM Gateway — Multi-Model High-Performance Stack (OpenAI SDK + auto-loads .env)
 
 Centralized LLM caller with token tracking and cost accounting.
 ALL agent LLM calls MUST go through this gateway.
+
+Routes each call to the optimal model for its role via model_config.py.
 
 Usage:
     from engine.llm_gateway import llm_call
@@ -16,6 +18,7 @@ Usage:
     )
 """
 
+import logging
 import os
 import re
 import json
@@ -24,38 +27,48 @@ from pathlib import Path
 
 import requests
 
+logger = logging.getLogger(__name__)
+
 # Ensure .env is loaded (belt-and-suspenders: database.py also loads it)
 try:
     from dotenv import load_dotenv
-    # Try project root .env first, then fallback
     _project_root = Path(__file__).resolve().parent.parent.parent
     _env_file = _project_root / ".env"
     if _env_file.exists():
         load_dotenv(_env_file, override=True)
-        print(f"[LLM Gateway] Loaded .env from {_env_file}")
+        logger.debug("Loaded .env from %s", _env_file)
     else:
-        load_dotenv(override=True)  # fallback to cwd
+        load_dotenv(override=True)
 except ImportError:
-    pass
+    logger.debug("dotenv not available, using process env")
+except Exception as e:
+    logger.warning("Failed to load .env: %s", e)
 
 from backend.engine.token_ledger import ledger
 from backend.models.pricing import get_model_pricing, estimate_cost
+from backend.engine.model_config import (
+    get_model_for_role,
+    get_profile,
+    get_profile_for_role,
+    get_chat_model,
+    get_coder_model,
+    supports_thinking as model_supports_thinking,
+)
 
 
-# Log which provider will be used
 _nim_key = os.getenv("NIM_API_KEY", "").strip()
-_nim_model = os.getenv("NIM_MODEL", "deepseek-ai/deepseek-v3.2")
-_nim_coder_model = os.getenv("NIM_CODER_MODEL", "")
-_nim_reasoning = os.getenv("NIM_REASONING", "true").lower() == "true"
+_nim_model = os.getenv("NIM_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1")
+_nim_coder_model = os.getenv("NIM_CODER_MODEL", "mistralai/devstral-2-123b-instruct-2512")
+_nim_reasoning = os.getenv("NIM_ENABLE_THINKING", "true").lower() == "true"
 
-print(f"[LLM Gateway] NIM_API_KEY set: {bool(_nim_key)} (len={len(_nim_key)})")
-print(f"[LLM Gateway] Analysis Model: {_nim_model}")
-print(f"[LLM Gateway] Reasoning Mode: {_nim_reasoning}")
-if _nim_coder_model:
-    print(f"[LLM Gateway] Coder Model: {_nim_coder_model}")
+NIM_BASE_URL = "https://integrate.api.nvidia.com/v1"
 
+logger.info(
+    "LLM Gateway: NIM_API_KEY set=%s, model=%s, coder=%s, thinking=%s",
+    bool(_nim_key), _nim_model, _nim_coder_model, _nim_reasoning,
+)
 if not _nim_key:
-    print("[LLM Gateway] WARNING: No NIM_API_KEY found.")
+    logger.warning("No NIM_API_KEY found; agents will fail. Set NIM_API_KEY in .env (nvapi-* from build.nvidia.com)")
 
 
 def count_tokens(messages: List[Dict[str, str]]) -> int:
@@ -89,78 +102,51 @@ def _call_nvidia_nim(
     temperature: float,
     api_key: str,
     enable_reasoning: bool = True,
+    top_p: Optional[float] = None,
 ) -> tuple[Optional[str], dict]:
-    """Call NVIDIA NIM API via OpenAI SDK with optional reasoning. Returns (content, usage_dict)."""
+    """Call NVIDIA NIM API via OpenAI SDK with per-model optimal parameters. Returns (content, usage_dict)."""
     try:
         from openai import OpenAI
 
         client = OpenAI(
-            base_url="https://integrate.api.nvidia.com/v1",
+            base_url=NIM_BASE_URL,
             api_key=api_key,
         )
 
-        is_deepseek = "deepseek" in model.lower()
-        use_reasoning = enable_reasoning and is_deepseek
+        # Get model profile for optimal parameters
+        profile = get_profile(model)
+        has_thinking = profile.supports_thinking and enable_reasoning
 
-        print(f"[LLM Gateway] Calling NIM: model={model}, max_tokens={max_tokens}, reasoning={use_reasoning}")
+        logger.debug(
+            "Calling NIM: model=%s, max_tokens=%s, thinking=%s, temp=%.2f, top_p=%.2f",
+            model, max_tokens, has_thinking, temperature, top_p or profile.top_p,
+        )
 
-        # Build request kwargs
         kwargs = dict(
             model=model,
             messages=messages,
-            temperature=temperature if not use_reasoning else 1,  # DeepSeek reasoning requires temp=1
-            top_p=0.95 if use_reasoning else 0.7,
+            temperature=temperature,
+            top_p=top_p if top_p is not None else profile.top_p,
             max_tokens=max_tokens,
-            stream=use_reasoning,  # Reasoning mode requires streaming
+            stream=False,
         )
 
-        # Add reasoning support for DeepSeek models
-        if use_reasoning:
-            kwargs["extra_body"] = {"chat_template_kwargs": {"thinking": True}}
+        completion = client.chat.completions.create(**kwargs)
+        if not completion.choices:
+            return None, {}
 
-        if use_reasoning:
-            # Streaming mode for reasoning — collect full response
-            stream = client.chat.completions.create(**kwargs)
-            content_parts = []
-            reasoning_parts = []
-            for chunk in stream:
-                if not getattr(chunk, "choices", None):
-                    continue
-                delta = chunk.choices[0].delta
-                # Collect reasoning tokens (internal chain-of-thought)
-                reasoning = getattr(delta, "reasoning_content", None)
-                if reasoning:
-                    reasoning_parts.append(reasoning)
-                # Collect content tokens (actual answer)
-                if delta.content is not None:
-                    content_parts.append(delta.content)
+        message = completion.choices[0].message
+        content = getattr(message, "content", "") or ""
+        usage = completion.usage
 
-            content = "".join(content_parts)
-            reasoning_text = "".join(reasoning_parts)
+        logger.debug("NIM response: model=%s, %s chars", model, len(content))
 
-            if reasoning_text:
-                print(f"[LLM Gateway] DeepSeek reasoning: {len(reasoning_text)} chars")
-            print(f"[LLM Gateway] NIM response: {len(content)} chars")
-
-            # Estimate tokens from char counts
-            return content.strip() if content else None, {
-                "input_tokens": sum(len(m.get('content', '')) for m in messages) // 4,
-                "output_tokens": (len(content) + len(reasoning_text)) // 4,
-            }
-        else:
-            # Standard non-streaming call
-            completion = client.chat.completions.create(**kwargs)
-            content = completion.choices[0].message.content if completion.choices else None
-            usage = completion.usage
-
-            print(f"[LLM Gateway] NIM response: {len(content or '')} chars")
-
-            return content.strip() if content else None, {
-                "input_tokens": usage.prompt_tokens if usage else 0,
-                "output_tokens": usage.completion_tokens if usage else 0,
-            }
+        return content.strip() if content else None, {
+            "input_tokens": usage.prompt_tokens if usage else 0,
+            "output_tokens": usage.completion_tokens if usage else 0,
+        }
     except Exception as e:
-        print(f"[LLM Gateway] NIM error: {e}")
+        logger.exception("NIM call failed: model=%s error=%s", model, e)
         return None, {}
 
 
@@ -171,6 +157,9 @@ def llm_call(
     max_tokens: int = 2048,
     temperature: float = 0.3,
     use_coder: bool = False,
+    top_p: Optional[float] = None,
+    enable_reasoning: Optional[bool] = None,
+    role: Optional[str] = None,
 ) -> Optional[str]:
     """
     Make an LLM call with automatic token tracking and cost accounting.
@@ -180,32 +169,53 @@ def llm_call(
     Args:
         agent_name: Name of the calling agent (for cost attribution)
         messages: List of message dicts with "role" and "content"
-        model: Model to use (auto-detected from env if None)
+        model: Model to use (auto-detected from role/env if None)
         max_tokens: Maximum tokens in response
-        temperature: Sampling temperature
+        temperature: Sampling temperature (overridden by model profile if role is set)
         use_coder: If True, use the dedicated coder model for code generation
+        top_p: Optional nucleus sampling value (defaults to model profile)
+        enable_reasoning: Optional reasoning toggle override
+        role: Agent role for model routing (e.g., "backend_engineer")
         
     Returns:
         Response content as string, or None if call failed
     """
+    if enable_reasoning is None:
+        enable_reasoning = os.getenv("NIM_ENABLE_THINKING", "true").lower() == "true"
+
     nim_key = os.getenv("NIM_API_KEY", "").strip()
-    nim_coder_key = os.getenv("NIM_CODER_API_KEY", "").strip()
 
-    enable_reasoning = os.getenv("NIM_REASONING", "true").lower() == "true"
-
-    if use_coder:
-        nim_default_model = os.getenv("NIM_CODER_MODEL", "") or os.getenv("NIM_MODEL", "deepseek-ai/deepseek-v3.2")
+    # Model selection priority: explicit model > role-based > coder > default
+    if model:
+        pass  # use the explicit model
+    elif role:
+        model = get_model_for_role(role)
+        # Use role-specific optimal parameters unless explicitly overridden
+        profile = get_profile(model)
+        if temperature == 0.3:  # default wasn't overridden
+            temperature = profile.temperature
+        if top_p is None:
+            top_p = profile.top_p
+    elif use_coder:
+        model = get_coder_model()
     else:
-        nim_default_model = os.getenv("NIM_MODEL", "deepseek-ai/deepseek-v3.2")
+        model = get_chat_model()
 
-    model = model or nim_default_model
-    key = nim_coder_key if use_coder else nim_key
+    key = nim_key
     
     if not key:
-        print(f"[LLM Gateway] ERROR: No API key available for {'coder' if use_coder else 'standard'} model")
+        logger.error("No API key available for model %s", model)
         return None
         
-    content, usage = _call_nvidia_nim(messages, model, max_tokens, temperature, key, enable_reasoning)
+    content, usage = _call_nvidia_nim(
+        messages=messages,
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        api_key=key,
+        enable_reasoning=enable_reasoning,
+        top_p=top_p,
+    )
     
     # Calculate cost
     input_tokens = usage.get("input_tokens", count_tokens(messages))
@@ -283,32 +293,34 @@ def _stream_nvidia_nim(
     temperature: float,
     api_key: str,
     enable_reasoning: bool = True,
+    top_p: Optional[float] = None,
 ):
-    """Stream tokens from NVIDIA NIM API with reasoning support. Yields token strings."""
+    """Stream tokens from NVIDIA NIM API with per-model parameters. Yields token strings."""
     try:
         from openai import OpenAI
 
         client = OpenAI(
-            base_url="https://integrate.api.nvidia.com/v1",
+            base_url=NIM_BASE_URL,
             api_key=api_key,
         )
 
-        is_deepseek = "deepseek" in model.lower()
-        use_reasoning = enable_reasoning and is_deepseek
+        # Get model profile
+        profile = get_profile(model)
+        has_thinking = profile.supports_thinking and enable_reasoning
 
-        print(f"[LLM Gateway] Streaming NIM: model={model}, max_tokens={max_tokens}, reasoning={use_reasoning}")
+        logger.debug(
+            "Streaming NIM: model=%s, max_tokens=%s, thinking=%s, temp=%.2f",
+            model, max_tokens, has_thinking, temperature,
+        )
 
         kwargs = dict(
             model=model,
             messages=messages,
-            temperature=1 if use_reasoning else temperature,
-            top_p=0.95 if use_reasoning else 0.7,
+            temperature=temperature,
+            top_p=top_p if top_p is not None else profile.top_p,
             max_tokens=max_tokens,
             stream=True,
         )
-
-        if use_reasoning:
-            kwargs["extra_body"] = {"chat_template_kwargs": {"thinking": True}}
 
         stream = client.chat.completions.create(**kwargs)
 
@@ -316,12 +328,14 @@ def _stream_nvidia_nim(
             if not getattr(chunk, "choices", None):
                 continue
             delta = chunk.choices[0].delta
-            # Skip reasoning tokens in streaming output (internal thinking)
-            # They're used by the model but we don't stream them to the user
+            # Yield reasoning tokens for models that support thinking
+            reasoning = getattr(delta, "reasoning_content", None)
+            if reasoning and has_thinking:
+                yield reasoning
             if delta.content is not None:
                 yield delta.content
     except Exception as e:
-        print(f"[LLM Gateway] NIM stream error: {e}")
+        logger.exception("NIM stream error: model=%s error=%s", model, e)
 
 
 def llm_call_stream(
@@ -331,9 +345,12 @@ def llm_call_stream(
     max_tokens: int = 2048,
     temperature: float = 0.3,
     use_coder: bool = False,
+    role: Optional[str] = None,
+    top_p: Optional[float] = None,
 ):
     """
     Streaming LLM call — yields tokens as they arrive.
+    Routes to the optimal model based on role.
 
     Args:
         agent_name: Name of the calling agent (for cost attribution)
@@ -342,24 +359,36 @@ def llm_call_stream(
         max_tokens: Max output tokens
         temperature: Sampling temperature
         use_coder: Use coder model
+        role: Agent role for model routing
+        top_p: Nucleus sampling override
 
     Yields:
         Token strings as they arrive from the LLM
     """
-    if use_coder:
-        nim_key = os.getenv("NIM_CODER_API_KEY", "").strip() or os.getenv("NIM_API_KEY", "").strip()
-        default_model = os.getenv("NIM_CODER_MODEL", "") or os.getenv("NIM_MODEL", "deepseek-ai/deepseek-v3.2")
-    else:
-        nim_key = os.getenv("NIM_API_KEY", "").strip()
-        default_model = os.getenv("NIM_MODEL", "deepseek-ai/deepseek-v3.2")
+    nim_key = os.getenv("NIM_API_KEY", "").strip()
 
-    enable_reasoning = os.getenv("NIM_REASONING", "true").lower() == "true"
+    # Model selection: explicit > role-based > coder > default
+    if model:
+        pass
+    elif role:
+        model = get_model_for_role(role)
+        profile = get_profile(model)
+        if temperature == 0.3:
+            temperature = profile.temperature
+        if top_p is None:
+            top_p = profile.top_p
+    elif use_coder:
+        model = get_coder_model()
+    else:
+        model = get_chat_model()
 
     if nim_key:
-        model = model or default_model
-        gen = _stream_nvidia_nim(messages, model, max_tokens, temperature, nim_key, enable_reasoning)
+        gen = _stream_nvidia_nim(
+            messages, model, max_tokens, temperature, nim_key,
+            top_p=top_p,
+        )
     else:
-        print("[LLM Gateway] ERROR: No NIM_API_KEY available for streaming")
+        logger.error("No NIM_API_KEY available for streaming")
         return
 
     full_content = []
